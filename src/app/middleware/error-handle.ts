@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from 'express'
+import { ErrorRequestHandler } from 'express'
 import _ from 'lodash'
 import multer from 'multer'
 import ErrorResponse from '~/lib/http/errors'
@@ -11,25 +11,28 @@ interface DtoErrorResponse {
 
 function generateErrorResponse(err: Error, statusCode: number): DtoErrorResponse {
   return _.isObject(err.message)
-    ? err.message
-    : { statusCode, error: err.name, message: err.message }
+    ? (err.message as any)
+    : {
+        statusCode,
+        error: err.name,
+        message: err.message,
+      }
 }
 
-export default async function expressErrorHandle(
-  err: any,
-  _req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  // catch error from multer
+const expressErrorHandle: ErrorRequestHandler = (err, _req, res, next) => {
+  // multer error
   if (err instanceof multer.MulterError) {
-    return res.status(400).json(generateErrorResponse(err, 400))
+    res.status(400).json(generateErrorResponse(err, 400))
+    return
   }
 
-  // catch from global error
+  // custom global error
   if (err instanceof ErrorResponse.BaseResponse) {
-    return res.status(err.statusCode).json(generateErrorResponse(err, err.statusCode))
+    res.status(err.statusCode).json(generateErrorResponse(err, err.statusCode))
+    return
   }
 
   next(err)
 }
+
+export default expressErrorHandle

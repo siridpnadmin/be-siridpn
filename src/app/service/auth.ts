@@ -101,21 +101,21 @@ export default class AuthService {
       })
 
       if (!getUser) {
-        throw new ErrorResponse.NotFound('user not found')
+        throw new ErrorResponse.NotFound('Email atau password salah')
       }
 
-      if (!getUser.is_active) {
-        throw new ErrorResponse.BadRequest('user is not active, please verify your email')
-      }
+      // if (!getUser.is_active) {
+      //   throw new ErrorResponse.BadRequest('user is not active, please verify your email')
+      // }
 
       const isPasswordMatch = await getUser.comparePassword(values.password)
       if (!isPasswordMatch) {
-        throw new ErrorResponse.BadRequest('current password is incorrect')
+        throw new ErrorResponse.BadRequest('Email atau password salah')
       }
 
       const getRole = await repo.role.findOne({ where: { id: getUser.role_id }, transaction })
       if (!getRole) {
-        throw new ErrorResponse.NotFound('role not found')
+        throw new ErrorResponse.NotFound('Akun Bermasalah hubungi admin')
       }
 
       const payload = JSON.parse(JSON.stringify({ uid: getUser.id }))

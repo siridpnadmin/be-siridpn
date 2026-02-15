@@ -1,7 +1,7 @@
 {
-  "name": "TITLE",
+  "name": "siridpn",
   "version": "6.0.0-3",
-  "description": "",
+  "description": "Sistem Informasi Riset dan Pengembangan Pusdiklat",
   "main": "src/main.ts",
   "private": true,
   "type": "commonjs",
@@ -36,7 +36,7 @@
     "api",
     "typescript"
   ],
-  "author": "masb0ymas <me@masb0ymas.com>",
+  "author": "anggabanny <anggabanny@gmail.com>",
   "license": "MIT",
   "engines": {
     "node": ">=20.x"

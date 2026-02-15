@@ -8,6 +8,7 @@ import { UserLoginState } from '../database/schema/user'
 import authorization from '../middleware/authorization'
 import { UserAgentState } from '../middleware/user-agent'
 import AuthService from '../service/auth'
+import { turnstile } from '../middleware/turnstile'
 
 const route = express.Router()
 const service = new AuthService()
@@ -26,6 +27,7 @@ route.post(
 
 route.post(
   '/sign-in',
+  turnstile,
   asyncHandler(async (req: Request, res: Response) => {
     const values = req.getBody()
     const userAgentState = req.getState('userAgent') as UserAgentState

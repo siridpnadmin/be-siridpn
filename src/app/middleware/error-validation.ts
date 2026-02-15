@@ -1,14 +1,9 @@
 import { green } from 'colorette'
-import { NextFunction, Request, Response } from 'express'
+import { ErrorRequestHandler } from 'express'
 import { z } from 'zod'
 import { logger } from '~/config/logger'
 
-export default async function expressErrorValidation(
-  err: any,
-  _req: Request,
-  res: Response,
-  next: NextFunction
-) {
+const expressErrorValidation: ErrorRequestHandler = (err, _req, res, next) => {
   if (err instanceof z.ZodError) {
     const msgType = green('zod')
     const message = 'validation error!'
@@ -17,21 +12,22 @@ export default async function expressErrorValidation(
 
     const errors =
       err.issues.length > 0
-        ? err.issues.reduce((acc: any, curVal: any) => {
-            acc[`${curVal.path}`] = curVal.message || curVal.type
+        ? err.issues.reduce((acc: Record<string, string>, curVal) => {
+            acc[curVal.path.join('.')] = curVal.message || curVal.code
             return acc
           }, {})
-        : { [`${err.issues[0].path}`]: err.issues[0].message }
+        : {}
 
-    const result = {
+    res.status(422).json({
       statusCode: 422,
       error: 'Unprocessable Content',
       message,
       errors,
-    }
-
-    return res.status(422).json(result)
+    })
+    return
   }
 
   next(err)
 }
+
+export default expressErrorValidation
