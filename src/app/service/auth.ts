@@ -60,7 +60,7 @@ export default class AuthService {
       is_blocked: false,
       phone: validate.empty(formData.phone),
       token_verify: token,
-      role_id: ConstRole.ID_USER,
+      // role_id: ConstRole.ID_USER,
       upload_id: null,
     })
 
@@ -124,16 +124,14 @@ export default class AuthService {
       const formSession = { ...formData, user_id: getUser.id, token }
       await repo.session.create({ ...formSession }, { transaction })
 
-      const is_admin = [ConstRole.ID_ADMIN, ConstRole.ID_SUPER_ADMIN].includes(getRole.id)
-
       data = {
         fullname: getUser.fullname,
         email: getUser.email,
         uid: getUser.id,
+        role: getRole.id,
         access_token: token,
         expires_at: new Date(Date.now() + expiresIn * 1000),
         expires_in: expiresIn,
-        is_admin,
       }
     })
 

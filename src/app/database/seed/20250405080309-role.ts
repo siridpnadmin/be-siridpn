@@ -10,12 +10,24 @@ const data = [
     name: 'Super Admin',
   },
   {
-    id: ConstRole.ID_ADMIN,
-    name: 'Admin',
+    id: ConstRole.ID_MANAGER_ADMIN,
+    name: 'Manager Admin',
   },
   {
-    id: ConstRole.ID_USER,
-    name: 'User',
+    id: ConstRole.ID_LOCAL_ADMIN,
+    name: 'Local Admin',
+  },
+  {
+    id: ConstRole.ID_CONTRIBUTOR,
+    name: 'Contributor',
+  },
+  {
+    id: ConstRole.ID_EXCECUTIVE,
+    name: 'Executive',
+  },
+  {
+    id: ConstRole.ID_PUBLIC,
+    name: 'Public',
   },
 ]
 

@@ -17,18 +17,33 @@ logger.info(`Seed - your default password: ${green(defaultPassword)}`)
 const data = [
   {
     fullname: 'Super Admin',
-    email: 'super.admin@example.com',
+    email: 'superadmin@siridpn.go.id',
     role_id: ConstRole.ID_SUPER_ADMIN,
   },
   {
-    fullname: 'Admin',
-    email: 'admin@example.com',
-    role_id: ConstRole.ID_ADMIN,
+    fullname: 'Manager Admin',
+    email: 'manageradmin@siridpn.go.id',
+    role_id: ConstRole.ID_MANAGER_ADMIN,
   },
   {
-    fullname: 'User',
-    email: 'user@example.com',
-    role_id: ConstRole.ID_USER,
+    fullname: 'Local Admin',
+    email: 'admin@siridpn.go.id',
+    role_id: ConstRole.ID_LOCAL_ADMIN,
+  },
+  {
+    fullname: 'Contributor',
+    email: 'contributor@siridpn.go.id',
+    role_id: ConstRole.ID_CONTRIBUTOR,
+  },
+  {
+    fullname: 'Executive',
+    email: 'executive@siridpn.go.id',
+    role_id: ConstRole.ID_EXCECUTIVE,
+  },
+  {
+    fullname: 'Public',
+    email: 'public@siridpn.go.id',
+    role_id: ConstRole.ID_PUBLIC,
   },
 ]
 
