@@ -20,8 +20,6 @@ WORKDIR /temp-build
 # copy base code
 COPY . .
 
-# copy environment
-RUN cp .env.example .env
 COPY --from=deps /temp-deps/node_modules ./node_modules
 
 RUN npm install -g pnpm@latest-10
@@ -43,10 +41,10 @@ RUN apk add nano
 COPY --from=builder /temp-build/public ./public
 COPY --from=builder /temp-build/node_modules ./node_modules
 COPY --from=builder /temp-build/package.json ./package.json
+COPY --from=builder /temp-build/.sequelizerc ./.sequelizerc
 COPY --from=builder /temp-build/script ./script
 COPY --from=builder /temp-build/logs ./logs
 COPY --from=builder /temp-build/dist ./dist
-COPY --from=builder /temp-build/.env ./.env
 
 # This container exposes port 8000 to the outside world
 EXPOSE 8000
