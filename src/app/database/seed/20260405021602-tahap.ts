@@ -1,12 +1,11 @@
 'use strict'
 
 import { DataTypes, QueryInterface } from 'sequelize'
-import { ConstYear } from '~/lib/constant/seed/year'
 import { v4 as uuidv4 } from 'uuid'
+import { ConstYear } from '~/lib/constant/seed/year'
 
 const tahapNames = ['Tahap Pertama', 'Tahap Kedua', 'Tahap Ketiga', 'Tahap Keempat', 'Tahap Kelima']
 
-/** @type {import('sequelize-cli').Migration} */
 export async function up(queryInterface: QueryInterface, Sequelize: typeof DataTypes) {
   const formData = []
 

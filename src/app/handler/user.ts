@@ -8,11 +8,12 @@ import UserService from '../service/user'
 
 const route = express.Router()
 const service = new UserService()
+const userManagementRoles = [ConstRole.ID_SUPER_ADMIN, ConstRole.ID_MANAGER_ADMIN]
 
 route.get(
   '/',
   authorization(),
-  permissionAccess(ConstRole.ROLE_ADMIN),
+  permissionAccess(userManagementRoles),
   asyncHandler(async (req: Request, res: Response) => {
     const { page, pageSize, filtered, sorted } = req.getQuery()
     const records = await service.findWithRelations({ page, pageSize, filtered, sorted })
@@ -24,7 +25,7 @@ route.get(
 route.get(
   '/:id',
   authorization(),
-  permissionAccess(ConstRole.ROLE_ADMIN),
+  permissionAccess(userManagementRoles),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.getParams()
     const record = await service.findByIdWithRelation(id)
@@ -36,7 +37,7 @@ route.get(
 route.post(
   '/',
   authorization(),
-  permissionAccess(ConstRole.ROLE_ADMIN),
+  permissionAccess(userManagementRoles),
   asyncHandler(async (req: Request, res: Response) => {
     const values = req.getBody()
     const record = await service.create(values)
@@ -48,7 +49,7 @@ route.post(
 route.put(
   '/:id',
   authorization(),
-  permissionAccess(ConstRole.ROLE_ADMIN),
+  permissionAccess(userManagementRoles),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.getParams()
     const values = req.getBody()
@@ -61,7 +62,7 @@ route.put(
 route.put(
   '/restore/:id',
   authorization(),
-  permissionAccess(ConstRole.ROLE_ADMIN),
+  permissionAccess(userManagementRoles),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.getParams()
     await service.restore(id)
@@ -73,7 +74,7 @@ route.put(
 route.delete(
   '/soft-delete/:id',
   authorization(),
-  permissionAccess(ConstRole.ROLE_ADMIN),
+  permissionAccess(userManagementRoles),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.getParams()
     await service.softDelete(id)
@@ -85,7 +86,7 @@ route.delete(
 route.delete(
   '/force-delete/:id',
   authorization(),
-  permissionAccess(ConstRole.ROLE_ADMIN),
+  permissionAccess(userManagementRoles),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.getParams()
     await service.forceDelete(id)

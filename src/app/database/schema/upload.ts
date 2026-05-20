@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import BaseSchema from '../entity/base'
 
-// Schema
 export const uploadSchema = z.object({
   keyfile: z
     .string('keyfile is required')
@@ -19,7 +18,6 @@ export const uploadSchema = z.object({
   expiry_date_url: z.date('expiry_date_url is required'),
 })
 
-// Type
 export type UploadSchema = z.infer<typeof uploadSchema> &
   Partial<BaseSchema> & {
     deleted_at?: Date | null

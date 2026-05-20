@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import BaseSchema from '../entity/base'
 
-// Schema
 export const sessionSchema = z.object({
   user_id: z.uuid({ message: 'user_id must be a valid UUID' }),
   token: z
@@ -15,5 +14,4 @@ export const sessionSchema = z.object({
   longitude: z.string('longitude is required').nullable().optional(),
 })
 
-// Type
 export type SessionSchema = z.infer<typeof sessionSchema> & BaseSchema

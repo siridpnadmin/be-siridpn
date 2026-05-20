@@ -3,7 +3,6 @@
 import { DataTypes, QueryInterface } from 'sequelize'
 import { ConstYear } from '~/lib/constant/seed/year'
 
-/** @type {import('sequelize-cli').Migration} */
 export async function up(queryInterface: QueryInterface, Sequelize: typeof DataTypes) {
   const formData = []
 

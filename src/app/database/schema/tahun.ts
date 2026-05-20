@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import BaseSchema from '../entity/base'
 
-// Schema
 export const tahunSchema = z.object({
   tahun: z
     .number('tahun is required')
@@ -10,7 +9,6 @@ export const tahunSchema = z.object({
     .max(2100, { message: 'tahun must be at most 2100' }),
 })
 
-// Type
 export type TahunSchema = z.infer<typeof tahunSchema> &
   BaseSchema & {
     deleted_at: Date | null

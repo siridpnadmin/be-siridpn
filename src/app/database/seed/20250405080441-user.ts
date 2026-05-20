@@ -47,10 +47,8 @@ const data = [
   },
 ]
 
-/** @type {import('sequelize-cli').Migration} */
 export async function up(queryInterface: QueryInterface, Sequelize: typeof DataTypes) {
   const password = await hashing.hash(defaultPassword)
-
   const formData: any[] = []
 
   if (!_.isEmpty(data)) {
@@ -61,6 +59,7 @@ export async function up(queryInterface: QueryInterface, Sequelize: typeof DataT
         ...item,
         id: uuidv4(),
         is_active: true,
+        is_blocked: false,
         password,
         created_at: new Date(),
         updated_at: new Date(),

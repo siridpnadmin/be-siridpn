@@ -2,7 +2,6 @@
 
 import { DataTypes, QueryInterface } from 'sequelize'
 
-/** @type {import('sequelize-cli').Migration} */
 export async function up(queryInterface: QueryInterface, Sequelize: typeof DataTypes) {
   await queryInterface.createTable('tahap', {
     id: {
@@ -29,7 +28,6 @@ export async function up(queryInterface: QueryInterface, Sequelize: typeof DataT
     tahun_mulai_id: {
       allowNull: false,
       type: Sequelize.UUID,
-      defaultValue: Sequelize.UUIDV4,
       references: {
         model: 'tahun',
         key: 'id',
@@ -38,7 +36,6 @@ export async function up(queryInterface: QueryInterface, Sequelize: typeof DataT
     tahun_selesai_id: {
       allowNull: false,
       type: Sequelize.UUID,
-      defaultValue: Sequelize.UUIDV4,
       references: {
         model: 'tahun',
         key: 'id',

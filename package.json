@@ -39,7 +39,7 @@
   "author": "anggabanny <anggabanny@gmail.com>",
   "license": "MIT",
   "engines": {
-    "node": ">=20.x"
+    "node": "20.20.0"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.896.0",

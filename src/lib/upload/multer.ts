@@ -46,10 +46,9 @@ export function useMulter(values: MulterConfig): multer.Multer {
 
       cb(null, true)
     },
-    // @ts-expect-error
-    limits: values.limit ?? {
-      fieldSize: default_field_size,
-      fileSize: default_file_size,
+    limits: {
+      fieldSize: values.limit?.field_size ?? default_field_size,
+      fileSize: values.limit?.file_size ?? default_file_size,
     },
   })
 }

@@ -2,7 +2,6 @@
 
 import { DataTypes, QueryInterface } from 'sequelize'
 
-/** @type {import('sequelize-cli').Migration} */
 export async function up(queryInterface: QueryInterface, Sequelize: typeof DataTypes) {
   await queryInterface.createTable('session', {
     id: {
@@ -22,7 +21,6 @@ export async function up(queryInterface: QueryInterface, Sequelize: typeof DataT
     user_id: {
       allowNull: false,
       type: Sequelize.UUID,
-      defaultValue: Sequelize.UUIDV4,
       references: {
         model: 'user',
         key: 'id',
@@ -42,7 +40,7 @@ export async function up(queryInterface: QueryInterface, Sequelize: typeof DataT
       type: Sequelize.STRING,
     },
     user_agent: {
-      type: Sequelize.STRING,
+      type: Sequelize.TEXT,
     },
     latitude: {
       type: Sequelize.STRING,

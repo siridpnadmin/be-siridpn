@@ -1,5 +1,5 @@
 import Storage from '~/lib/storage'
-import { S3StorageParams, StorageType } from '~/lib/storage/types'
+import { MinIOStorageParams, StorageType } from '~/lib/storage/types'
 import { env } from './env'
 
 export const storage = Storage.create({
@@ -10,5 +10,9 @@ export const storage = Storage.create({
     bucket: env.STORAGE_BUCKET_NAME,
     expires: env.STORAGE_SIGN_EXPIRED,
     region: env.STORAGE_REGION,
-  } as S3StorageParams,
+    host: env.STORAGE_HOST,
+    port: env.STORAGE_PORT || 9000,
+    ssl: false,
+    filepath: env.STORAGE_FILEPATH,
+  } as MinIOStorageParams,
 })

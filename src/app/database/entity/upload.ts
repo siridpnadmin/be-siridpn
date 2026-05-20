@@ -1,5 +1,6 @@
-import { Column, DataType, DeletedAt, Table } from 'sequelize-typescript'
+import { Column, DataType, DeletedAt, HasMany, Table } from 'sequelize-typescript'
 import BaseSchema from './base'
+import User from './user'
 
 @Table({ tableName: 'upload', paranoid: true })
 export default class Upload extends BaseSchema {
@@ -24,4 +25,7 @@ export default class Upload extends BaseSchema {
 
   @Column({ allowNull: false })
   expiry_date_url: Date
+
+  @HasMany(() => User)
+  users: User[]
 }

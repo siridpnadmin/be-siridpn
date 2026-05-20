@@ -31,7 +31,6 @@ const data = [
   },
 ]
 
-/** @type {import('sequelize-cli').Migration} */
 export async function up(queryInterface: QueryInterface, Sequelize: typeof DataTypes) {
   const formData: any[] = []
 

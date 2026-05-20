@@ -8,11 +8,12 @@ import RoleService from '../service/role'
 
 const route = express.Router()
 const service = new RoleService()
+const userManagementRoles = [ConstRole.ID_SUPER_ADMIN, ConstRole.ID_MANAGER_ADMIN]
 
 route.get(
   '/',
   authorization(),
-  permissionAccess(ConstRole.ROLE_ADMIN),
+  permissionAccess(userManagementRoles),
   asyncHandler(async (req: Request, res: Response) => {
     const { page, pageSize, filtered, sorted } = req.getQuery()
     const records = await service.find({ page, pageSize, filtered, sorted })
@@ -24,7 +25,7 @@ route.get(
 route.get(
   '/:id',
   authorization(),
-  permissionAccess(ConstRole.ROLE_ADMIN),
+  permissionAccess(userManagementRoles),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.getParams()
     const record = await service.findById(id)

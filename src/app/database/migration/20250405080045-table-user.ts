@@ -2,7 +2,6 @@
 
 import { DataTypes, QueryInterface } from 'sequelize'
 
-/** @type {import('sequelize-cli').Migration} */
 export async function up(queryInterface: QueryInterface, Sequelize: typeof DataTypes) {
   await queryInterface.createTable('user', {
     id: {
@@ -56,7 +55,6 @@ export async function up(queryInterface: QueryInterface, Sequelize: typeof DataT
     role_id: {
       allowNull: false,
       type: Sequelize.UUID,
-      defaultValue: Sequelize.UUIDV4,
       references: {
         model: 'role',
         key: 'id',
@@ -65,7 +63,6 @@ export async function up(queryInterface: QueryInterface, Sequelize: typeof DataT
     upload_id: {
       allowNull: true,
       type: Sequelize.UUID,
-      defaultValue: Sequelize.UUIDV4,
       references: {
         model: 'upload',
         key: 'id',

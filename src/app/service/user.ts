@@ -1,4 +1,5 @@
 import { Includeable, Model, ModelStatic } from 'sequelize'
+import { db } from '../database/connection'
 import ErrorResponse from '~/lib/http/errors'
 import { useQuery } from '~/lib/query-builder'
 import { validate } from '~/lib/validate'
@@ -6,7 +7,13 @@ import Role from '../database/entity/role'
 import Session from '../database/entity/session'
 import Upload from '../database/entity/upload'
 import User from '../database/entity/user'
-import { changePasswordSchema, ChangePasswordSchema, userSchema } from '../database/schema/user'
+import UserDpnAccess from '../database/entity/user-dpn-access'
+import {
+  changePasswordSchema,
+  ChangePasswordSchema,
+  userSchema,
+  userUpdateSchema,
+} from '../database/schema/user'
 import BaseService from './base'
 import { DtoFindAll, FindParams } from './types'
 
@@ -15,11 +22,13 @@ type UserModel = User & Model
 type RoleModel = Role & Model
 type UploadModel = Upload & Model
 type SessionModel = Session & Model
+type UserDpnAccessModel = UserDpnAccess & Model
 
 const relations: Includeable[] = [
   { model: Role as unknown as ModelStatic<RoleModel> },
   { model: Upload as unknown as ModelStatic<UploadModel> },
   { model: Session as unknown as ModelStatic<SessionModel> },
+  { model: UserDpnAccess as unknown as ModelStatic<UserDpnAccessModel> },
 ]
 
 export default class UserService extends BaseService<UserModel> {
@@ -73,6 +82,35 @@ export default class UserService extends BaseService<UserModel> {
     return record
   }
 
+  async create(data: UserModel): Promise<UserModel> {
+    const values = userSchema.parse(data)
+    const { dpn_accesses = [], ...userValues } = values
+
+    let record: UserModel
+    await db.sequelize!.transaction(async (transaction) => {
+      record = await this.repository.create(userValues as any, { transaction })
+      await this._syncDpnAccess(record.id, dpn_accesses, transaction)
+    })
+
+    return this.findByIdWithRelation(record!.id) as Promise<UserModel>
+  }
+
+  async update(id: string, data: UserModel): Promise<UserModel> {
+    const record = await this.findById(id)
+    const values = userUpdateSchema.parse({
+      ...(record.toJSON() as Record<string, unknown>),
+      ...(data as unknown as Record<string, unknown>),
+    })
+    const { dpn_accesses = [], ...userValues } = values
+
+    await db.sequelize!.transaction(async (transaction) => {
+      await record.update(userValues as any, { transaction })
+      await this._syncDpnAccess(record.id, dpn_accesses, transaction)
+    })
+
+    return this.findByIdWithRelation(record.id) as Promise<UserModel>
+  }
+
   /**
    * Check email
    */
@@ -82,6 +120,25 @@ export default class UserService extends BaseService<UserModel> {
     if (record) {
       throw new ErrorResponse.BadRequest('email already exists')
     }
+  }
+
+  private async _syncDpnAccess(userId: string, dpnAccesses: string[], transaction: any) {
+    const normalizedDpnCodes = [...new Set(dpnAccesses.map((item) => item.trim()).filter(Boolean))]
+
+    await UserDpnAccess.destroy({
+      where: { user_id: userId },
+      transaction,
+    })
+
+    if (normalizedDpnCodes.length === 0) return
+
+    await UserDpnAccess.bulkCreate(
+      normalizedDpnCodes.map((dpnCode) => ({
+        user_id: userId,
+        dpn_code: dpnCode,
+      })),
+      { transaction }
+    )
   }
 
   /**

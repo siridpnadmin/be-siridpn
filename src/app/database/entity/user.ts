@@ -19,6 +19,7 @@ import BaseSchema from './base'
 import Role from './role'
 import Session from './session'
 import Upload from './upload'
+import UserDpnAccess from './user-dpn-access'
 
 const hashing = new Hashing()
 
@@ -73,7 +74,6 @@ export default class User extends BaseSchema {
   @ForeignKey(() => Role)
   @Column({
     type: DataType.UUID,
-    defaultValue: DataType.UUIDV4,
     allowNull: false,
   })
   role_id: string
@@ -85,17 +85,18 @@ export default class User extends BaseSchema {
   @ForeignKey(() => Upload)
   @Column({
     type: DataType.UUID,
-    defaultValue: DataType.UUIDV4,
+    allowNull: true,
   })
-  upload_id: string
+  upload_id?: string
 
-  // many to one
   @BelongsTo(() => Upload)
   upload?: Upload
 
-  // one to many
   @HasMany(() => Session)
   sessions: Session[]
+
+  @HasMany(() => UserDpnAccess)
+  dpn_accesses: UserDpnAccess[]
 
   @Column({ type: DataType.VIRTUAL })
   new_password: string
@@ -120,7 +121,6 @@ export default class User extends BaseSchema {
   }
 }
 
-// compare password
 User.prototype.comparePassword = async function (current_password: string): Promise<boolean> {
   const password = String(this.password)
 

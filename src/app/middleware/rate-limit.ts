@@ -1,10 +1,15 @@
-import { NextFunction, Request, Response } from 'express'
+import { NextFunction, Request, RequestHandler, Response } from 'express'
 import rateLimit, { Options, RateLimitRequestHandler } from 'express-rate-limit'
+import { env } from '~/config/env'
 
-export default function expressRateLimit(): RateLimitRequestHandler {
+export default function expressRateLimit(): RateLimitRequestHandler | RequestHandler {
+  if (!env.RATE_LIMIT_ENABLED) {
+    return (_req: Request, _res: Response, next: NextFunction) => next()
+  }
+
   return rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requests
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    max: env.RATE_LIMIT_MAX,
     handler: (_req: Request, res: Response, _next: NextFunction, options: Options) => {
       const result = {
         statusCode: options.statusCode,

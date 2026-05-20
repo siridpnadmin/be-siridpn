@@ -3,6 +3,8 @@ import _ from 'lodash'
 import { asyncHandler } from '~/lib/async-handler'
 import { deleteFile } from '~/lib/fs/delete-file'
 import HttpResponse from '~/lib/http/response'
+import { allowed_pdf } from '~/lib/constant/upload/allowed-extension'
+import { Mimetype } from '~/lib/constant/upload/allowed-mimetypes'
 import { FileParams } from '~/lib/storage/types'
 import { useMulter } from '~/lib/upload/multer'
 import authorization from '../middleware/authorization'
@@ -13,6 +15,12 @@ const service = new UploadService()
 
 const uploadFile = useMulter({
   dest: 'public/uploads/temp',
+  allowed_ext: allowed_pdf,
+  allowed_mimetype: new Mimetype().pdf,
+  limit: {
+    field_size: 10 * 1024 * 1024,
+    file_size: 10 * 1024 * 1024,
+  },
 }).fields([{ name: 'file_upload', maxCount: 1 }])
 
 const setFileToBody = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
