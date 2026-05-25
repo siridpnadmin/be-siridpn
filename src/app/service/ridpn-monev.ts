@@ -71,6 +71,16 @@ function toBoolean(value?: string | boolean | number | null) {
   return ['1', 'true', 'yes', 'ya', 'y'].includes(normalized)
 }
 
+function serializeLaporanMonev(laporan: LaporanMonev) {
+  const values = laporan.get({ plain: true })
+
+  return {
+    ...values,
+    created_at: values.created_at ?? null,
+    updated_at: values.updated_at ?? values.created_at ?? null,
+  }
+}
+
 export default class RidpnMonevService {
   async list(perpresDpnTahapId: string | number) {
     const kegiatanRows = await Kegiatan.findAll({
@@ -102,7 +112,7 @@ export default class RidpnMonevService {
       nama_pelaksana: row.pelaksana?.nama_pelaksana ?? null,
       laporan: (row.laporanMonev ?? [])
         .sort((left, right) => Number(right.laporan_monev_id) - Number(left.laporan_monev_id))
-        .map((laporan) => laporan.get()),
+        .map((laporan) => serializeLaporanMonev(laporan)),
     }))
   }
 
@@ -160,11 +170,12 @@ export default class RidpnMonevService {
 
       if (existing) {
         await existing.update({ ...values, updated_at: new Date() }, { transaction })
-        return existing.reload({ transaction })
+        const record = await existing.reload({ transaction })
+        return serializeLaporanMonev(record)
       }
 
       const now = new Date()
-      return LaporanMonev.create(
+      const record = await LaporanMonev.create(
         {
           laporan_monev_id: await nextId(LaporanMonev, 'laporan_monev_id', transaction),
           created_at: now,
@@ -173,6 +184,7 @@ export default class RidpnMonevService {
         },
         { transaction }
       )
+      return serializeLaporanMonev(record)
     })
   }
 

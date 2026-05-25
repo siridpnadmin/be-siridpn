@@ -35,7 +35,15 @@ function getBrowserExecutablePath() {
   const configuredPath = env.PUPPETEER_EXECUTABLE_PATH
   if (configuredPath && fs.existsSync(configuredPath)) return configuredPath
 
-  const candidates = ['/usr/bin/chromium-browser', '/usr/bin/chromium', '/usr/bin/google-chrome-stable']
+  const candidates = [
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/usr/bin/google-chrome-stable',
+    'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+    'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
+    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  ]
   const executablePath = candidates.find((candidate) => fs.existsSync(candidate))
 
   if (!executablePath) {
@@ -62,6 +70,39 @@ function parseCookies(cookieHeader = '') {
       }
     })
     .filter((cookie): cookie is { name: string; value: string; domain: string; path: string } => cookie !== null)
+}
+
+async function preparePageForExport(page: any) {
+  await page.addStyleTag({
+    content: `
+      [data-export-ignore="true"],
+      nav.fixed.top-0,
+      body > nav,
+      aside,
+      aside.fixed {
+        display: none !important;
+      }
+
+      .pt-14 {
+        padding-top: 0 !important;
+      }
+
+      main {
+        margin-left: 0 !important;
+      }
+    `,
+  })
+
+  await page.evaluate(`
+    document.querySelectorAll('[data-export-ignore="true"], nav.fixed.top-0, body > nav, aside').forEach((element) => {
+      element.remove()
+    })
+
+    document.querySelectorAll('main').forEach((element) => {
+      element.classList.remove('ml-60', 'ml-0')
+      element.style.marginLeft = '0'
+    })
+  `)
 }
 
 export default class PageExportService {
@@ -104,9 +145,7 @@ export default class PageExportService {
         timeout: 60_000,
       })
 
-      await page.evaluate(
-        'document.querySelectorAll("[data-export-ignore=\\"true\\"]").forEach((element) => element.remove())'
-      )
+      await preparePageForExport(page)
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
       if (format === 'pdf') {

@@ -183,11 +183,18 @@ export default class CsvDataService {
   async create(table: string, payload: Record<string, unknown>) {
     const { repository, primaryKeys } = this.getConfig(table)
     const values = { ...payload }
+    const normalizedTable = table.replace(/-/g, '_')
 
     if (primaryKeys.length === 1 && values[primaryKeys[0]] === undefined) {
       const primaryKey = primaryKeys[0]
       const maxId = await repository.max(primaryKey)
       values[primaryKey] = Number(maxId || 0) + 1
+    }
+
+    if (normalizedTable === 'laporan_monev') {
+      const now = new Date()
+      values.created_at = values.created_at ?? now
+      values.updated_at = values.updated_at ?? values.created_at
     }
 
     await this.assertKegiatanNumberIsUnique(table, values)
@@ -206,7 +213,13 @@ export default class CsvDataService {
     const nextValues = { ...record.get(), ...payload }
     await this.assertKegiatanNumberIsUnique(table, nextValues, id)
 
-    await record.update(payload)
+    const normalizedTable = table.replace(/-/g, '_')
+    const values =
+      normalizedTable === 'laporan_monev'
+        ? { ...payload, updated_at: new Date() }
+        : payload
+
+    await record.update(values)
     return record
   }
 
