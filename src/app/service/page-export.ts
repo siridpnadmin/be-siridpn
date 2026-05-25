@@ -152,6 +152,7 @@ export default class PageExportService {
         const buffer = Buffer.from(
           await page.pdf({
             format: 'A4',
+            landscape: true,
             printBackground: true,
             preferCSSPageSize: false,
             margin: {
