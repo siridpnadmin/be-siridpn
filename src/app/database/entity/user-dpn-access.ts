@@ -1,20 +1,24 @@
-import { BelongsTo, Column, DataType, ForeignKey, IsUUID, Table } from 'sequelize-typescript'
-import BaseSchema from './base'
+import { BelongsTo, Column, DataType, ForeignKey, Model, PrimaryKey, Table } from 'sequelize-typescript'
+import Dpn from './dpn'
 import User from './user'
 
-@Table({ tableName: 'user_dpn_access' })
-export default class UserDpnAccess extends BaseSchema {
-  @IsUUID(4)
+@Table({ tableName: 'user_dpn_access', underscored: true, timestamps: true })
+export default class UserDpnAccess extends Model {
+  @PrimaryKey
+  @Column({ type: DataType.UUID, allowNull: false, defaultValue: DataType.UUIDV4 })
+  id: string
+
   @ForeignKey(() => User)
-  @Column({
-    type: DataType.UUID,
-    allowNull: false,
-  })
+  @Column({ type: DataType.UUID, allowNull: false })
   user_id: string
 
-  @BelongsTo(() => User)
-  user: User
+  @ForeignKey(() => Dpn)
+  @Column({ type: DataType.BIGINT, allowNull: false })
+  dpn_id: number
 
-  @Column({ type: DataType.STRING('50'), allowNull: false })
-  dpn_code: string
+  @BelongsTo(() => User, 'user_id')
+  user?: User
+
+  @BelongsTo(() => Dpn, 'dpn_id')
+  dpn?: Dpn
 }

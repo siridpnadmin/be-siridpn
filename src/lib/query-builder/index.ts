@@ -82,7 +82,8 @@ function getFilteredQuery(params: SequelizeGetFilteredQuery): SqlizeQuery {
         queryHelper.setQuery(curId, { [Op.like]: `%${value}%` })
       }
     } else {
-      queryHelper.setQuery(curId, curId.endsWith('Id') ? value : { [Op.like]: `%${value}%` })
+      const numericValue = Number(value)
+      queryHelper.setQuery(curId, { [Op.eq]: Number.isNaN(numericValue) ? value : numericValue })
     }
   })
 

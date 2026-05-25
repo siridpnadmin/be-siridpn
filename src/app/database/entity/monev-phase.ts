@@ -1,34 +1,32 @@
-import { Column, DataType, DeletedAt, Table } from 'sequelize-typescript'
-import BaseSchema from './base'
+import { Column, DataType, Default, Model, PrimaryKey, Table } from 'sequelize-typescript'
 
-export type MonevPhaseStatus = 'aktif' | 'nonaktif'
+@Table({ tableName: 'monev_phase', timestamps: false })
+export default class MonevPhase extends Model {
+  @PrimaryKey
+  @Column({ type: DataType.STRING(36), allowNull: false })
+  id: string
 
-@Table({ tableName: 'monev_phase', paranoid: true })
-export default class MonevPhase extends BaseSchema {
-  @DeletedAt
-  @Column
-  deleted_at?: Date
-
-  @Column({ type: DataType.STRING('100'), allowNull: false })
+  @Column({ type: DataType.STRING(255), allowNull: false })
   nama_fase: string
 
-  @Column({ type: DataType.STRING('150'), allowNull: false })
+  @Column({ type: DataType.TEXT, allowNull: false })
   perpres: string
 
-  @Column({ type: DataType.STRING('150'), allowNull: false, unique: true })
+  @Column({ type: DataType.STRING(255), allowNull: false })
   url_slug: string
 
-  @Column({ type: DataType.STRING('50'), allowNull: false, unique: true })
+  @Column({ type: DataType.STRING(100), allowNull: false })
   kode_akses: string
 
-  @Column({ type: DataType.STRING('20'), allowNull: false })
+  @Column({ type: DataType.STRING(20), allowNull: false })
   periode: string
 
-  @Column({ type: DataType.STRING('50'), allowNull: false, defaultValue: '0 OPD' })
+  @Column({ type: DataType.STRING(100), allowNull: false })
   submisi: string
 
-  @Column({ type: DataType.ENUM('aktif', 'nonaktif'), allowNull: false, defaultValue: 'aktif' })
-  status: MonevPhaseStatus
+  @Default('aktif')
+  @Column({ type: DataType.ENUM('aktif', 'nonaktif'), allowNull: false })
+  status: string
 
   @Column({ type: DataType.DATEONLY, allowNull: false })
   tanggal_mulai: string
@@ -36,12 +34,26 @@ export default class MonevPhase extends BaseSchema {
   @Column({ type: DataType.DATEONLY, allowNull: false })
   tanggal_selesai: string
 
-  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  @Default(0)
+  @Column({ type: DataType.INTEGER, allowNull: false })
   jumlah_submisi: number
 
-  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  @Default(0)
+  @Column({ type: DataType.INTEGER, allowNull: false })
   total_ra: number
 
-  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  @Default(0)
+  @Column({ type: DataType.INTEGER, allowNull: false })
   perlu_review: number
+
+  @Default(DataType.NOW)
+  @Column({ type: DataType.DATE, allowNull: false })
+  created_at: Date
+
+  @Default(DataType.NOW)
+  @Column({ type: DataType.DATE, allowNull: false })
+  updated_at: Date
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  deleted_at?: Date
 }

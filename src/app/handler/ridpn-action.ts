@@ -1,17 +1,22 @@
 import express, { Request, Response } from 'express'
 import { asyncHandler } from '~/lib/async-handler'
 import HttpResponse from '~/lib/http/response'
-import RidpnDocumentService from '../service/ridpn-document'
+import RidpnActionService from '../service/ridpn-action'
 
 const route = express.Router()
-const service = new RidpnDocumentService()
+const service = new RidpnActionService()
 
 route.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const { page, pageSize } = req.getQuery()
-    const records = await service.list(Number(page || 1), Number(pageSize || 1000))
-    const httpResponse = HttpResponse.get({ data: records })
+    const { perpres_dpn_tahap_id } = req.getQuery()
+    const records = perpres_dpn_tahap_id ? await service.list(perpres_dpn_tahap_id as string) : []
+    const httpResponse = HttpResponse.get({
+      data: {
+        data: records,
+        total: records.length,
+      },
+    })
     res.status(200).json(httpResponse)
   })
 )
@@ -45,4 +50,4 @@ route.delete(
   })
 )
 
-export { route as RidpnDocumentHandler }
+export { route as RidpnActionHandler }

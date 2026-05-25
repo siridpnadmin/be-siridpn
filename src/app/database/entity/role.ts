@@ -1,16 +1,21 @@
-import { Column, DeletedAt, HasMany, Table } from 'sequelize-typescript'
-import BaseSchema from './base'
+import { Column, DataType, HasMany, Model, PrimaryKey, Table } from 'sequelize-typescript'
 import User from './user'
 
-@Table({ tableName: 'role', paranoid: true })
-export default class Role extends BaseSchema {
-  @DeletedAt
-  @Column
-  deleted_at?: Date
+@Table({ tableName: 'roles', timestamps: false })
+export default class Role extends Model {
+  @PrimaryKey
+  @Column({ type: DataType.STRING(50), allowNull: false })
+  code: string
 
-  @Column({ allowNull: false })
+  @Column({ type: DataType.STRING(100), allowNull: false })
   name: string
 
-  @HasMany(() => User)
-  users: User[]
+  @Column({ type: DataType.TEXT, allowNull: true })
+  description?: string
+
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  manageable: boolean
+
+  @HasMany(() => User, 'role_code')
+  users?: User[]
 }
