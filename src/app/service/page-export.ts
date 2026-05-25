@@ -149,18 +149,21 @@ export default class PageExportService {
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
       if (format === 'pdf') {
+        await page.emulateMediaType('screen')
+        const pageSize = await page.evaluate(`
+          ({
+            width: Math.ceil(Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, window.innerWidth)),
+            height: Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, window.innerHeight))
+          })
+        `)
+
         const buffer = Buffer.from(
           await page.pdf({
-            format: 'A4',
-            landscape: true,
+            width: `${pageSize.width}px`,
+            height: `${pageSize.height}px`,
             printBackground: true,
             preferCSSPageSize: false,
-            margin: {
-              top: '10mm',
-              right: '10mm',
-              bottom: '10mm',
-              left: '10mm',
-            },
+            margin: { top: '0px', right: '0px', bottom: '0px', left: '0px' },
           })
         )
 
