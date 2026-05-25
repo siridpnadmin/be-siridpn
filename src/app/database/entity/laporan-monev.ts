@@ -10,6 +10,9 @@ export default class LaporanMonev extends Model {
   @Column({ type: DataType.DATE, allowNull: false })
   created_at: Date
 
+  @Column({ type: DataType.DATE, allowNull: true })
+  updated_at?: Date
+
   @Column({ type: DataType.BIGINT, allowNull: false })
   kegiatan_pelaksana_id: number
 

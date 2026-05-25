@@ -35,8 +35,17 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# editor cli with nano
-RUN apk add nano
+# runtime tools and Chromium for server-side page export
+RUN apk add --no-cache \
+  nano \
+  chromium \
+  nss \
+  freetype \
+  harfbuzz \
+  ca-certificates \
+  ttf-freefont
+
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 COPY --from=builder /temp-build/public ./public
 COPY --from=builder /temp-build/node_modules ./node_modules

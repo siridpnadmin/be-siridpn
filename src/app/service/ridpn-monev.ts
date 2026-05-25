@@ -159,14 +159,16 @@ export default class RidpnMonevService {
       }
 
       if (existing) {
-        await existing.update(values, { transaction })
+        await existing.update({ ...values, updated_at: new Date() }, { transaction })
         return existing.reload({ transaction })
       }
 
+      const now = new Date()
       return LaporanMonev.create(
         {
           laporan_monev_id: await nextId(LaporanMonev, 'laporan_monev_id', transaction),
-          created_at: new Date(),
+          created_at: now,
+          updated_at: now,
           ...values,
         },
         { transaction }
@@ -216,6 +218,7 @@ export default class RidpnMonevService {
       .map((row) => ({
         laporan_monev_id: row.laporan_monev_id,
         created_at: row.created_at,
+        updated_at: row.updated_at,
         kegiatan_pelaksana_id: row.kegiatan_pelaksana_id,
         instansi_pelaksana:
           row.kegiatanPelaksana?.pelaksana?.nama_pelaksana ?? row.konfirmasi_satker ?? null,

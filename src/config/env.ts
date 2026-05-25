@@ -6,6 +6,8 @@ export const env = {
   APP_PORT: validate.number(process.env.APP_PORT) || 8000,
   APP_NAME: process.env.APP_NAME || 'Backend',
   APP_URL: process.env.APP_URL || 'http://localhost:8000',
+  EXPORT_APP_URL: process.env.EXPORT_APP_URL || process.env.APP_URL || 'http://localhost:8000',
+  PUPPETEER_EXECUTABLE_PATH: process.env.PUPPETEER_EXECUTABLE_PATH || '',
   APP_DEFAULT_PASS: process.env.APP_DEFAULT_PASS || 'yourpassword',
   RATE_LIMIT_ENABLED: validate.boolean(process.env.RATE_LIMIT_ENABLED ?? true),
   RATE_LIMIT_WINDOW_MS: validate.number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
