@@ -5,9 +5,11 @@ import { Mimetype } from '~/lib/constant/upload/allowed-mimetypes'
 import HttpResponse from '~/lib/http/response'
 import { useMulter } from '~/lib/upload/multer'
 import RidpnMonevService from '../service/ridpn-monev'
+import NotificationService, { type CurrentUser } from '../service/notification'
 
 const route = express.Router()
 const service = new RidpnMonevService()
+const notificationService = new NotificationService()
 const mimetype = new Mimetype()
 const upload = useMulter({
   allowed_ext: [...allowed_pdf, ...allowed_excel],
@@ -48,7 +50,14 @@ route.post(
   '/',
   upload.single('bukti'),
   asyncHandler(async (req: Request, res: Response) => {
-    const record = await service.save(req.body, req.file)
+    let actor: CurrentUser | null = null
+    try {
+      actor = await notificationService.getCurrentUser(req)
+    } catch (_error) {
+      actor = null
+    }
+
+    const record = await service.save(req.body, req.file, actor)
     const httpResponse = HttpResponse.updated({ data: record })
     res.status(200).json(httpResponse)
   })

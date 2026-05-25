@@ -5,6 +5,7 @@ import Kegiatan from '../database/entity/kegiatan'
 import KegiatanPelaksana from '../database/entity/kegiatan-pelaksana'
 import KegiatanTahun from '../database/entity/kegiatan-tahun'
 import Komponen from '../database/entity/komponen'
+import LaporanMonev from '../database/entity/laporan-monev'
 import Pelaksana from '../database/entity/pelaksana'
 import Tahun from '../database/entity/tahun'
 
@@ -170,6 +171,49 @@ export default class RidpnActionService {
     return ids
   }
 
+  private async syncPelaksana(savedKegiatanId: number, pelaksanaIds: number[], transaction: any) {
+    const existingRows = await KegiatanPelaksana.findAll({
+      where: { kegiatan_id: savedKegiatanId },
+      transaction,
+    })
+    const desiredPelaksanaIds = new Set(pelaksanaIds)
+    const existingPelaksanaIds = new Set(existingRows.map((row) => Number(row.pelaksana_id)))
+    const rowsToDelete = existingRows.filter((row) => !desiredPelaksanaIds.has(Number(row.pelaksana_id)))
+
+    if (rowsToDelete.length) {
+      const kegiatanPelaksanaIds = rowsToDelete.map((row) => Number(row.kegiatan_pelaksana_id))
+      const usedCount = await LaporanMonev.count({
+        where: { kegiatan_pelaksana_id: { [Op.in]: kegiatanPelaksanaIds } },
+        transaction,
+      })
+
+      if (usedCount > 0) {
+        throw new ErrorResponse.BadRequest(
+          'Pelaksana tidak bisa dihapus karena sudah memiliki laporan monev.'
+        )
+      }
+
+      await KegiatanPelaksana.destroy({
+        where: { kegiatan_pelaksana_id: { [Op.in]: kegiatanPelaksanaIds } },
+        transaction,
+      })
+    }
+
+    const pelaksanaIdsToCreate = pelaksanaIds.filter((pelaksanaId) => !existingPelaksanaIds.has(pelaksanaId))
+    if (!pelaksanaIdsToCreate.length) return
+
+    let nextKegiatanPelaksanaId = await nextId(KegiatanPelaksana, 'kegiatan_pelaksana_id', transaction)
+    await KegiatanPelaksana.bulkCreate(
+      pelaksanaIdsToCreate.map((pelaksanaId) => ({
+        kegiatan_pelaksana_id: nextKegiatanPelaksanaId++,
+        kegiatan_id: savedKegiatanId,
+        pelaksana_id: pelaksanaId,
+        catatan: null,
+      })),
+      { transaction }
+    )
+  }
+
   async save(payload: RidpnActionPayload, kegiatanId?: string | number) {
     if (!payload.perpres_dpn_tahap_id) {
       throw new ErrorResponse.BadRequest('Dokumen RIDPN wajib diisi.')
@@ -244,28 +288,7 @@ export default class RidpnActionService {
         )
       }
 
-      await KegiatanPelaksana.destroy({
-        where: { kegiatan_id: savedKegiatanId },
-        transaction,
-      })
-
-      if (pelaksanaIds.length) {
-        let nextKegiatanPelaksanaId = await nextId(
-          KegiatanPelaksana,
-          'kegiatan_pelaksana_id',
-          transaction
-        )
-
-        await KegiatanPelaksana.bulkCreate(
-          pelaksanaIds.map((pelaksanaId) => ({
-            kegiatan_pelaksana_id: nextKegiatanPelaksanaId++,
-            kegiatan_id: savedKegiatanId,
-            pelaksana_id: pelaksanaId,
-            catatan: null,
-          })),
-          { transaction }
-        )
-      }
+      await this.syncPelaksana(savedKegiatanId, pelaksanaIds, transaction)
 
       return Kegiatan.findByPk(savedKegiatanId, { transaction })
     })
@@ -274,7 +297,28 @@ export default class RidpnActionService {
   async delete(kegiatanId: string | number) {
     return db.sequelize.transaction(async (transaction) => {
       await KegiatanTahun.destroy({ where: { kegiatan_id: kegiatanId }, transaction })
-      await KegiatanPelaksana.destroy({ where: { kegiatan_id: kegiatanId }, transaction })
+      const kegiatanPelaksanaRows = await KegiatanPelaksana.findAll({
+        where: { kegiatan_id: kegiatanId },
+        transaction,
+      })
+      const kegiatanPelaksanaIds = kegiatanPelaksanaRows.map((row) => Number(row.kegiatan_pelaksana_id))
+      if (kegiatanPelaksanaIds.length) {
+        const usedCount = await LaporanMonev.count({
+          where: { kegiatan_pelaksana_id: { [Op.in]: kegiatanPelaksanaIds } },
+          transaction,
+        })
+
+        if (usedCount > 0) {
+          throw new ErrorResponse.BadRequest(
+            'Rencana aksi tidak bisa dihapus karena sudah memiliki laporan monev.'
+          )
+        }
+
+        await KegiatanPelaksana.destroy({
+          where: { kegiatan_pelaksana_id: { [Op.in]: kegiatanPelaksanaIds } },
+          transaction,
+        })
+      }
       const deleted = await Kegiatan.destroy({ where: { kegiatan_id: kegiatanId }, transaction })
 
       if (!deleted) {

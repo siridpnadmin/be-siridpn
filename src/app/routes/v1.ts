@@ -8,6 +8,7 @@ import { AuthHandler } from '../handler/auth'
 import { CsvDataHandler, createCsvTableHandler } from '../handler/csv-data'
 import { MonevPhaseHandler } from '../handler/monev-phase'
 import { ManagementReportHandler } from '../handler/management-report'
+import { NotificationHandler } from '../handler/notification'
 import { KtaAreaHandler } from '../handler/kta-area'
 import { PageExportHandler } from '../handler/page-export'
 import { RidpnActionHandler } from '../handler/ridpn-action'
@@ -45,6 +46,7 @@ route.use('/auth', AuthHandler)
 route.use('/users', UserManagementHandler)
 route.use('/monev-phase', MonevPhaseHandler)
 route.use('/management-report', ManagementReportHandler)
+route.use('/notifications', NotificationHandler)
 route.use('/export', PageExportHandler)
 route.use('/kta-area', KtaAreaHandler)
 route.use('/ridpn-actions', RidpnActionHandler)

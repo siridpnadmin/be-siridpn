@@ -7,6 +7,7 @@ import Dpn from '../database/entity/dpn'
 import JenisPelaksana from '../database/entity/jenis-pelaksana'
 import ManagementReport from '../database/entity/management-report'
 import Pelaksana from '../database/entity/pelaksana'
+import NotificationService, { type CurrentUser } from './notification'
 
 type ReportPayload = {
   dpn_id?: string | number | null
@@ -29,6 +30,8 @@ function cleanText(value: unknown) {
 }
 
 export default class ManagementReportService {
+  private notificationService = new NotificationService()
+
   async list({ search = '', page = 1, pageSize = 5000 }: { search?: string; page?: number; pageSize?: number }) {
     const where = cleanText(search)
       ? {
@@ -56,7 +59,31 @@ export default class ManagementReportService {
     }
   }
 
-  async save(payload: ReportPayload, file?: Express.Multer.File, id?: string | number) {
+  private async notifyReportChanged(action: 'created' | 'updated' | 'deleted', record: Record<string, any>, actor?: CurrentUser | null) {
+    if (!actor) return
+
+    const actionLabel = action === 'created' ? 'diupload' : action === 'updated' ? 'diperbarui' : 'dihapus'
+
+    await this.notificationService.createForRoles(['super_admin', 'manager_admin'], {
+      actor_user_id: actor.id,
+      type: action === 'deleted' ? 'warning' : 'info',
+      category: 'management-report',
+      title: `File pelaporan ${actionLabel}`,
+      message: `${actor.name || actor.email || 'User'} ${actionLabel} file "${record.nama_file}" untuk ${record.dpn_nama} Tahap ${record.tahap}.`,
+      link: '/admin/management-report',
+      metadata: {
+        management_report_id: record.id,
+        dpn_id: record.dpn_id,
+        dpn_nama: record.dpn_nama,
+        kelompok_kerja: record.kelompok_kerja,
+        nama_file: record.nama_file,
+        tahap: record.tahap,
+        action,
+      },
+    })
+  }
+
+  async save(payload: ReportPayload, file?: Express.Multer.File, id?: string | number, actor?: CurrentUser | null) {
     const dpnId = asNumber(payload.dpn_id)
     const tahap = asNumber(payload.tahap)
     const tahun = asNumber(payload.tahun)
@@ -136,16 +163,22 @@ export default class ManagementReportService {
 
     if (existing) {
       await existing.update(values)
-      return existing.reload()
+      const record = await existing.reload()
+      await this.notifyReportChanged('updated', record.get({ plain: true }), actor)
+      return record
     }
 
-    return ManagementReport.create(values)
+    const record = await ManagementReport.create(values)
+    await this.notifyReportChanged('created', record.get({ plain: true }), actor)
+    return record
   }
 
-  async remove(id: string | number) {
+  async remove(id: string | number, actor?: CurrentUser | null) {
     const row = await ManagementReport.findByPk(id)
     if (!row) throw new ErrorResponse.NotFound('File pelaporan tidak ditemukan.')
+    const record = row.get({ plain: true })
     await row.destroy()
+    await this.notifyReportChanged('deleted', record, actor)
   }
 
   async getDownload(id: string | number) {

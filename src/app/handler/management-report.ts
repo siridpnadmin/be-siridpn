@@ -5,15 +5,25 @@ import { asyncHandler } from '~/lib/async-handler'
 import HttpResponse from '~/lib/http/response'
 import { useMulter } from '~/lib/upload/multer'
 import ManagementReportService from '../service/management-report'
+import NotificationService, { type CurrentUser } from '../service/notification'
 
 const route = express.Router()
 const service = new ManagementReportService()
+const notificationService = new NotificationService()
 const mimetype = new Mimetype()
 const upload = useMulter({
   allowed_ext: allowed_pdf,
   allowed_mimetype: mimetype.pdf,
   limit: { file_size: 10 * 1024 * 1024 },
 })
+
+async function getOptionalActor(req: Request): Promise<CurrentUser | null> {
+  try {
+    return await notificationService.getCurrentUser(req)
+  } catch (_error) {
+    return null
+  }
+}
 
 route.get(
   '/',
@@ -40,7 +50,8 @@ route.post(
   '/',
   upload.single('file'),
   asyncHandler(async (req: Request, res: Response) => {
-    const record = await service.save(req.body, req.file)
+    const actor = await getOptionalActor(req)
+    const record = await service.save(req.body, req.file, undefined, actor)
     res.status(201).json(HttpResponse.created({ data: record }))
   })
 )
@@ -50,7 +61,8 @@ route.put(
   upload.single('file'),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.getParams()
-    const record = await service.save(req.body, req.file, id)
+    const actor = await getOptionalActor(req)
+    const record = await service.save(req.body, req.file, id, actor)
     res.status(200).json(HttpResponse.updated({ data: record }))
   })
 )
@@ -59,7 +71,8 @@ route.delete(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.getParams()
-    await service.remove(id)
+    const actor = await getOptionalActor(req)
+    await service.remove(id, actor)
     res.status(200).json(HttpResponse.deleted({ data: {} }))
   })
 )

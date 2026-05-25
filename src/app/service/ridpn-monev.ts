@@ -8,6 +8,8 @@ import Kegiatan from '../database/entity/kegiatan'
 import KegiatanPelaksana from '../database/entity/kegiatan-pelaksana'
 import LaporanMonev from '../database/entity/laporan-monev'
 import Pelaksana from '../database/entity/pelaksana'
+import PerpresDpnTahap from '../database/entity/perpres-dpn-tahap'
+import NotificationService, { type CurrentUser } from './notification'
 
 type MonevStatus =
   | 'terlaksana'
@@ -82,6 +84,8 @@ function serializeLaporanMonev(laporan: LaporanMonev) {
 }
 
 export default class RidpnMonevService {
+  private notificationService = new NotificationService()
+
   async list(perpresDpnTahapId: string | number) {
     const kegiatanRows = await Kegiatan.findAll({
       where: { perpres_dpn_tahap_id: Number(perpresDpnTahapId) },
@@ -116,7 +120,51 @@ export default class RidpnMonevService {
     }))
   }
 
-  async save(payload: MonevPayload, file?: Express.Multer.File) {
+  private async notifyMonevSaved(record: Record<string, any>, actor?: CurrentUser | null) {
+    const kegiatanPelaksana = await KegiatanPelaksana.findByPk(record.kegiatan_pelaksana_id, {
+      include: [
+        { model: Pelaksana },
+        {
+          model: Kegiatan,
+          include: [{ model: PerpresDpnTahap }],
+        },
+      ],
+    })
+    const reporterName =
+      record.nama_operator ||
+      record.nama_pejabat_penanggung_jawab ||
+      record.konfirmasi_satker ||
+      null
+    const actorName = reporterName || actor?.name || actor?.email || 'Kontributor'
+    const pelaksanaName = kegiatanPelaksana?.pelaksana?.nama_pelaksana || record.konfirmasi_satker || 'Pelaksana'
+    const status = record.status_kegiatan || 'belum dikonfirmasi'
+    const document = kegiatanPelaksana?.kegiatan?.perpresDpnTahap
+    const dpnId = document?.dpn_id
+    const documentId = document?.perpres_dpn_tahap_id
+    const link =
+      dpnId && documentId
+        ? `/admin/ridpn/${dpnId}/${documentId}/monitoring-evaluasi`
+        : '/admin/ridpn'
+
+    await this.notificationService.createForRolesAndDpnLocalAdmins(['super_admin', 'manager_admin'], dpnId, {
+      actor_user_id: reporterName ? null : actor?.id ?? null,
+      type: record.perlu_review ? 'warning' : 'info',
+      category: 'monev',
+      title: record.perlu_review ? 'Monev perlu review' : 'Monev diperbarui',
+      message: `${actorName} memperbarui monev ${pelaksanaName} dengan status ${status}.`,
+      link,
+      metadata: {
+        laporan_monev_id: record.laporan_monev_id,
+        kegiatan_pelaksana_id: record.kegiatan_pelaksana_id,
+        dpn_id: dpnId ?? null,
+        perpres_dpn_tahap_id: documentId ?? null,
+        status_kegiatan: record.status_kegiatan,
+        perlu_review: record.perlu_review,
+      },
+    })
+  }
+
+  async save(payload: MonevPayload, file?: Express.Multer.File, actor?: CurrentUser | null) {
     if (!payload.kegiatan_pelaksana_id) {
       throw new ErrorResponse.BadRequest('Pelaksana rencana aksi wajib diisi.')
     }
@@ -136,7 +184,7 @@ export default class RidpnMonevService {
       await unlink(file.path).catch(() => undefined)
     }
 
-    return db.sequelize.transaction(async (transaction) => {
+    const record = await db.sequelize.transaction(async (transaction) => {
       const targetId = payload.laporan_monev_id
       const existing = targetId
         ? await LaporanMonev.findByPk(targetId, { transaction })
@@ -186,6 +234,9 @@ export default class RidpnMonevService {
       )
       return serializeLaporanMonev(record)
     })
+
+    await this.notifyMonevSaved(record, actor)
+    return record
   }
 
   async getDownload(laporanMonevId: string | number) {
