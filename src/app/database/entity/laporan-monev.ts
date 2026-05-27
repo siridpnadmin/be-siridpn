@@ -73,6 +73,15 @@ export default class LaporanMonev extends Model {
   @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
   perlu_review: boolean
 
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: true })
+  aktif: boolean
+
+  @Column({ type: DataType.TEXT, allowNull: true })
+  diubah_oleh?: string
+
+  @Column({ type: DataType.TEXT, allowNull: true })
+  diubah_oleh_email?: string
+
   @BelongsTo(() => KegiatanPelaksana, 'kegiatan_pelaksana_id')
   kegiatanPelaksana?: KegiatanPelaksana
 }

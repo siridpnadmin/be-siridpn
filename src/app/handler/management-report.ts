@@ -39,6 +39,22 @@ route.get(
 )
 
 route.get(
+  '/stakeholder-options',
+  asyncHandler(async (_req: Request, res: Response) => {
+    const records = await service.stakeholderOptions()
+    res.status(200).json(HttpResponse.get({ data: { data: records, total: records.length } }))
+  })
+)
+
+route.post(
+  '/stakeholder-options',
+  asyncHandler(async (req: Request, res: Response) => {
+    const record = await service.createStakeholderOption(req.body)
+    res.status(201).json(HttpResponse.created({ data: record }))
+  })
+)
+
+route.get(
   '/pelaksana-options',
   asyncHandler(async (_req: Request, res: Response) => {
     const records = await service.pelaksanaOptions()

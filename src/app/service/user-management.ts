@@ -1,5 +1,6 @@
 import Hashing from '~/config/hashing'
 import { Request } from 'express'
+import { Op } from 'sequelize'
 import ErrorResponse from '~/lib/http/errors'
 import { useQuery } from '~/lib/query-builder'
 import JwtToken from '~/lib/token/jwt'
@@ -26,11 +27,17 @@ type UserPayload = {
 }
 
 type LoginPayload = {
+  identifier?: string
   email?: string
   password?: string
 }
 
 const manageableRoleCodes = ['super_admin', 'manager_admin', 'local_admin', 'executive']
+const usernamePattern = /^[a-z0-9._-]+$/
+
+function normalizeUsername(value?: string) {
+  return String(value || '').trim().toLowerCase()
+}
 
 export default class UserManagementService {
   private hashing = new Hashing()
@@ -66,6 +73,44 @@ export default class UserManagementService {
     }
 
     return normalizedDpnIds
+  }
+
+  private assertUsername(name?: string) {
+    const username = normalizeUsername(name)
+
+    if (!username) {
+      throw new ErrorResponse.BadRequest('username is required')
+    }
+
+    if (!usernamePattern.test(username)) {
+      throw new ErrorResponse.BadRequest(
+        'username can only use lowercase letters, numbers, dots, underscores, and hyphens'
+      )
+    }
+
+    return username
+  }
+
+  private async assertUniqueUserIdentity(username: string, email?: string, excludeId?: string) {
+    const conditions: Array<{ name: string } | { email: string }> = [{ name: username }]
+    if (email) {
+      conditions.push({ email })
+    }
+
+    const existingUser = await User.findOne({
+      where: {
+        [Op.or]: conditions,
+        ...(excludeId ? { id: { [Op.ne]: excludeId } } : {}),
+      },
+    })
+
+    if (!existingUser) return
+
+    if (existingUser.name === username) {
+      throw new ErrorResponse.BadRequest('username already exists')
+    }
+
+    throw new ErrorResponse.BadRequest('email already exists')
   }
 
   private async syncDpnAccess(userId: string, roleCode: string, dpnIds?: Array<number | string>) {
@@ -120,17 +165,15 @@ export default class UserManagementService {
     this.assertDpnAccessPayload(payload.role_code, payload.dpn_ids)
 
     if (!payload.name || !payload.email || !payload.password) {
-      throw new ErrorResponse.BadRequest('name, email, and password are required')
+      throw new ErrorResponse.BadRequest('username, email, and password are required')
     }
     const roleCode = payload.role_code as string
+    const username = this.assertUsername(payload.name)
 
-    const existingUser = await User.findOne({ where: { email: payload.email } })
-    if (existingUser) {
-      throw new ErrorResponse.BadRequest('email already exists')
-    }
+    await this.assertUniqueUserIdentity(username, payload.email)
 
     const user = await User.create({
-      name: payload.name,
+      name: username,
       email: payload.email,
       password: await this.hashing.hash(payload.password),
       role_code: roleCode,
@@ -152,18 +195,14 @@ export default class UserManagementService {
       this.assertManageableRole(payload.role_code)
     }
 
-    if (payload.email && payload.email !== user.email) {
-      const existingUser = await User.findOne({ where: { email: payload.email } })
-      if (existingUser) {
-        throw new ErrorResponse.BadRequest('email already exists')
-      }
-    }
+    const nextUsername = payload.name ? this.assertUsername(payload.name) : user.name
+    await this.assertUniqueUserIdentity(nextUsername, payload.email, user.id)
 
     const nextRoleCode = payload.role_code ?? user.role_code
     this.assertDpnAccessPayload(nextRoleCode, payload.dpn_ids)
 
     await user.update({
-      name: payload.name ?? user.name,
+      name: nextUsername,
       email: payload.email ?? user.email,
       password: payload.password ? await this.hashing.hash(payload.password) : user.password,
       role_code: nextRoleCode,
@@ -185,17 +224,21 @@ export default class UserManagementService {
   }
 
   async login(payload: LoginPayload) {
-    if (!payload.email || !payload.password) {
-      throw new ErrorResponse.BadRequest('email and password are required')
+    const identifier = String(payload.identifier || payload.email || '').trim().toLowerCase()
+
+    if (!identifier || !payload.password) {
+      throw new ErrorResponse.BadRequest('email/username and password are required')
     }
 
     const user = await User.findOne({
-      where: { email: payload.email },
+      where: {
+        [Op.or]: [{ email: identifier }, { name: identifier }],
+      },
       include: [Role],
     })
 
     if (!user || !(await this.hashing.verify(user.password, payload.password))) {
-      throw new ErrorResponse.Unauthorized('invalid email or password')
+      throw new ErrorResponse.Unauthorized('invalid email/username or password')
     }
 
     const userData = this.sanitizeUser(user)

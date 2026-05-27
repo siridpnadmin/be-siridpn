@@ -40,6 +40,9 @@ type MonevPayload = {
   nama_operator?: string | null
   nomor_email_kontak?: string | null
   perlu_review?: string | boolean | number | null
+  aktif?: string | boolean | number | null
+  diubah_oleh?: string | null
+  diubah_oleh_email?: string | null
 }
 
 async function nextId(model: any, primaryKey: string, transaction: any) {
@@ -73,6 +76,10 @@ function toBoolean(value?: string | boolean | number | null) {
   return ['1', 'true', 'yes', 'ya', 'y'].includes(normalized)
 }
 
+function hasPayloadField(payload: MonevPayload, key: keyof MonevPayload) {
+  return Object.prototype.hasOwnProperty.call(payload, key)
+}
+
 function serializeLaporanMonev(laporan: LaporanMonev) {
   const values = laporan.get({ plain: true })
 
@@ -83,8 +90,32 @@ function serializeLaporanMonev(laporan: LaporanMonev) {
   }
 }
 
+function compareLaporanByCreatedDesc(left: LaporanMonev, right: LaporanMonev) {
+  const leftTime = new Date(left.created_at).getTime()
+  const rightTime = new Date(right.created_at).getTime()
+  if (leftTime !== rightTime) return rightTime - leftTime
+  return Number(right.laporan_monev_id) - Number(left.laporan_monev_id)
+}
+
 export default class RidpnMonevService {
   private notificationService = new NotificationService()
+
+  private async deactivateSiblingSnapshots(
+    kegiatanPelaksanaId: number,
+    activeLaporanMonevId: number,
+    transaction: any
+  ) {
+    await LaporanMonev.update(
+      { aktif: false },
+      {
+        where: {
+          kegiatan_pelaksana_id: kegiatanPelaksanaId,
+          laporan_monev_id: { [Op.ne]: activeLaporanMonevId },
+        },
+        transaction,
+      }
+    )
+  }
 
   async list(perpresDpnTahapId: string | number) {
     const kegiatanRows = await Kegiatan.findAll({
@@ -115,7 +146,8 @@ export default class RidpnMonevService {
       pelaksana_id: row.pelaksana_id,
       nama_pelaksana: row.pelaksana?.nama_pelaksana ?? null,
       laporan: (row.laporanMonev ?? [])
-        .sort((left, right) => Number(right.laporan_monev_id) - Number(left.laporan_monev_id))
+        .sort(compareLaporanByCreatedDesc)
+        .slice(0, 5)
         .map((laporan) => serializeLaporanMonev(laporan)),
     }))
   }
@@ -188,36 +220,84 @@ export default class RidpnMonevService {
       const targetId = payload.laporan_monev_id
       const existing = targetId
         ? await LaporanMonev.findByPk(targetId, { transaction })
-        : await LaporanMonev.findOne({
-            where: { kegiatan_pelaksana_id: Number(payload.kegiatan_pelaksana_id) },
-            transaction,
-          })
+        : null
+
+      if (targetId && !existing) {
+        throw new ErrorResponse.NotFound('Laporan monev tidak ditemukan.')
+      }
+
+      const kegiatanPelaksanaId = Number(payload.kegiatan_pelaksana_id)
+      const payloadAktif = toBoolean(payload.aktif)
+      const payloadPerluReview = toBoolean(payload.perlu_review)
+      const nextLinkBukti = file || hasPayloadField(payload, 'link_bukti') ? linkBukti || null : existing?.link_bukti ?? null
+      const nextBuktiTipe = file || hasPayloadField(payload, 'bukti_tipe') ? buktiTipe || null : existing?.bukti_tipe ?? null
+      const actorName =
+        String(payload.diubah_oleh ?? '').trim() ||
+        actor?.name ||
+        actor?.email ||
+        payload.nama_operator ||
+        payload.nama_pejabat_penanggung_jawab ||
+        null
+      const actorEmail =
+        String(payload.diubah_oleh_email ?? '').trim() ||
+        actor?.email ||
+        null
 
       const values = {
-        kegiatan_pelaksana_id: Number(payload.kegiatan_pelaksana_id),
-        status_kegiatan: normalizeStatus(payload.status_kegiatan),
-        konfirmasi_satker: payload.konfirmasi_satker || null,
-        uraian_keterangan: payload.uraian_keterangan || null,
-        pagu_anggaran: toNumber(payload.pagu_anggaran),
-        realisasi_anggaran: toNumber(payload.realisasi_anggaran),
-        kendala: payload.kendala || null,
-        tindak_lanjut: payload.tindak_lanjut || null,
-        link_bukti: linkBukti || null,
-        bukti_tipe: buktiTipe || null,
-        progress_semester_1: toNumber(payload.progress_semester_1),
-        progress_semester_2: toNumber(payload.progress_semester_2),
-        indikator: payload.indikator || null,
-        output: payload.output || null,
-        outcome: payload.outcome || null,
-        nama_pejabat_penanggung_jawab: payload.nama_pejabat_penanggung_jawab || null,
-        jabatan_penanggung_jawab: payload.jabatan_penanggung_jawab || null,
-        nama_operator: payload.nama_operator || null,
-        nomor_email_kontak: payload.nomor_email_kontak || null,
-        perlu_review: toBoolean(payload.perlu_review) ?? existing?.perlu_review ?? true,
+        kegiatan_pelaksana_id: kegiatanPelaksanaId,
+        status_kegiatan: hasPayloadField(payload, 'status_kegiatan')
+          ? normalizeStatus(payload.status_kegiatan)
+          : existing?.status_kegiatan ?? 'belum dikonfirmasi',
+        konfirmasi_satker: hasPayloadField(payload, 'konfirmasi_satker')
+          ? payload.konfirmasi_satker || null
+          : existing?.konfirmasi_satker ?? null,
+        uraian_keterangan: hasPayloadField(payload, 'uraian_keterangan')
+          ? payload.uraian_keterangan || null
+          : existing?.uraian_keterangan ?? null,
+        pagu_anggaran: hasPayloadField(payload, 'pagu_anggaran')
+          ? toNumber(payload.pagu_anggaran)
+          : existing?.pagu_anggaran ?? null,
+        realisasi_anggaran: hasPayloadField(payload, 'realisasi_anggaran')
+          ? toNumber(payload.realisasi_anggaran)
+          : existing?.realisasi_anggaran ?? null,
+        kendala: hasPayloadField(payload, 'kendala') ? payload.kendala || null : existing?.kendala ?? null,
+        tindak_lanjut: hasPayloadField(payload, 'tindak_lanjut')
+          ? payload.tindak_lanjut || null
+          : existing?.tindak_lanjut ?? null,
+        link_bukti: nextLinkBukti,
+        bukti_tipe: nextBuktiTipe,
+        progress_semester_1: hasPayloadField(payload, 'progress_semester_1')
+          ? toNumber(payload.progress_semester_1)
+          : existing?.progress_semester_1 ?? null,
+        progress_semester_2: hasPayloadField(payload, 'progress_semester_2')
+          ? toNumber(payload.progress_semester_2)
+          : existing?.progress_semester_2 ?? null,
+        indikator: hasPayloadField(payload, 'indikator') ? payload.indikator || null : existing?.indikator ?? null,
+        output: hasPayloadField(payload, 'output') ? payload.output || null : existing?.output ?? null,
+        outcome: hasPayloadField(payload, 'outcome') ? payload.outcome || null : existing?.outcome ?? null,
+        nama_pejabat_penanggung_jawab: hasPayloadField(payload, 'nama_pejabat_penanggung_jawab')
+          ? payload.nama_pejabat_penanggung_jawab || null
+          : existing?.nama_pejabat_penanggung_jawab ?? null,
+        jabatan_penanggung_jawab: hasPayloadField(payload, 'jabatan_penanggung_jawab')
+          ? payload.jabatan_penanggung_jawab || null
+          : existing?.jabatan_penanggung_jawab ?? null,
+        nama_operator: hasPayloadField(payload, 'nama_operator')
+          ? payload.nama_operator || null
+          : existing?.nama_operator ?? null,
+        nomor_email_kontak: hasPayloadField(payload, 'nomor_email_kontak')
+          ? payload.nomor_email_kontak || null
+          : existing?.nomor_email_kontak ?? null,
+        perlu_review: payloadPerluReview ?? existing?.perlu_review ?? true,
+        aktif: payloadAktif ?? existing?.aktif ?? true,
+        diubah_oleh: hasPayloadField(payload, 'diubah_oleh') || !existing ? actorName : existing?.diubah_oleh ?? actorName,
+        diubah_oleh_email: hasPayloadField(payload, 'diubah_oleh_email') || !existing ? actorEmail : existing?.diubah_oleh_email ?? actorEmail,
       }
 
       if (existing) {
         await existing.update({ ...values, updated_at: new Date() }, { transaction })
+        if (values.aktif) {
+          await this.deactivateSiblingSnapshots(kegiatanPelaksanaId, Number(existing.laporan_monev_id), transaction)
+        }
         const record = await existing.reload({ transaction })
         return serializeLaporanMonev(record)
       }
@@ -232,6 +312,9 @@ export default class RidpnMonevService {
         },
         { transaction }
       )
+      if (record.aktif) {
+        await this.deactivateSiblingSnapshots(kegiatanPelaksanaId, Number(record.laporan_monev_id), transaction)
+      }
       return serializeLaporanMonev(record)
     })
 
@@ -258,18 +341,24 @@ export default class RidpnMonevService {
     return { response, contentType, filename }
   }
 
-  async contributors() {
+  async contributors(user?: CurrentUser | null) {
     const rows = await LaporanMonev.findAll({
       include: [
         {
           model: KegiatanPelaksana,
-          include: [{ model: Pelaksana }],
+          include: [
+            { model: Pelaksana },
+            {
+              model: Kegiatan,
+              include: [{ model: PerpresDpnTahap }],
+            },
+          ],
         },
       ],
       order: [['created_at', 'desc']],
     })
 
-    return rows
+    const records = rows
       .filter((row) =>
         Boolean(
           row.nama_pejabat_penanggung_jawab ||
@@ -278,19 +367,31 @@ export default class RidpnMonevService {
             row.nomor_email_kontak
         )
       )
-      .map((row) => ({
-        laporan_monev_id: row.laporan_monev_id,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        kegiatan_pelaksana_id: row.kegiatan_pelaksana_id,
-        instansi_pelaksana:
-          row.kegiatanPelaksana?.pelaksana?.nama_pelaksana ?? row.konfirmasi_satker ?? null,
-        nama_pejabat_penanggung_jawab: row.nama_pejabat_penanggung_jawab ?? null,
-        jabatan_penanggung_jawab: row.jabatan_penanggung_jawab ?? null,
-        nama_operator: row.nama_operator ?? null,
-        nomor_email_kontak: row.nomor_email_kontak ?? null,
-        link_bukti: row.link_bukti ?? null,
-        bukti_tipe: row.bukti_tipe ?? null,
-      }))
+      .map((row) => {
+        const document = row.kegiatanPelaksana?.kegiatan?.perpresDpnTahap
+        return {
+          laporan_monev_id: row.laporan_monev_id,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          kegiatan_pelaksana_id: row.kegiatan_pelaksana_id,
+          perpres_dpn_tahap_id: document?.perpres_dpn_tahap_id ?? null,
+          dpn_id: document?.dpn_id ?? null,
+          instansi_pelaksana:
+            row.kegiatanPelaksana?.pelaksana?.nama_pelaksana ?? row.konfirmasi_satker ?? null,
+          nama_pejabat_penanggung_jawab: row.nama_pejabat_penanggung_jawab ?? null,
+          jabatan_penanggung_jawab: row.jabatan_penanggung_jawab ?? null,
+          nama_operator: row.nama_operator ?? null,
+          nomor_email_kontak: row.nomor_email_kontak ?? null,
+          link_bukti: row.link_bukti ?? null,
+          bukti_tipe: row.bukti_tipe ?? null,
+        }
+      })
+
+    if (user?.role_code === 'local_admin') {
+      const allowedDpnIds = new Set((user.dpn_access ?? []).map((access) => String(access.dpn_id)))
+      return records.filter((record) => record.dpn_id !== null && allowedDpnIds.has(String(record.dpn_id)))
+    }
+
+    return records
   }
 }

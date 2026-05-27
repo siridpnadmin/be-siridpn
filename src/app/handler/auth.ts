@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express'
+import { env } from '~/config/env'
 import { asyncHandler } from '~/lib/async-handler'
 import HttpResponse from '~/lib/http/response'
 import UserManagementService from '../service/user-management'
@@ -12,7 +13,7 @@ route.post(
     const session = await service.login(req.getBody())
     res.cookie('token', session.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: env.COOKIE_SECURE,
       sameSite: 'lax',
       maxAge: session.expiresIn * 1000,
       path: '/',
@@ -28,7 +29,7 @@ route.post(
     const session = await service.login(req.getBody())
     res.cookie('token', session.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: env.COOKIE_SECURE,
       sameSite: 'lax',
       maxAge: session.expiresIn * 1000,
       path: '/',

@@ -11,6 +11,9 @@ export type CurrentUser = {
   name?: string | null
   email?: string | null
   role_code?: string | null
+  dpn_access?: Array<{
+    dpn_id: string | number
+  }>
 }
 
 type FindParams = {

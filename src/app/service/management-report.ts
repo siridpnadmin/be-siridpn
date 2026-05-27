@@ -4,9 +4,9 @@ import { storage } from '~/config/storage'
 import { storageExists } from '~/lib/boolean'
 import ErrorResponse from '~/lib/http/errors'
 import Dpn from '../database/entity/dpn'
-import JenisPelaksana from '../database/entity/jenis-pelaksana'
 import ManagementReport from '../database/entity/management-report'
-import Pelaksana from '../database/entity/pelaksana'
+import Stakeholder from '../database/entity/stakeholder'
+import StakeholderDpn from '../database/entity/stakeholder-dpn'
 import NotificationService, { type CurrentUser } from './notification'
 
 type ReportPayload = {
@@ -17,6 +17,11 @@ type ReportPayload = {
   tahap?: string | number | null
   tahun?: string | number | null
   keterangan?: string | null
+}
+
+type StakeholderPayload = {
+  dpn_id?: string | number | null
+  name?: string | null
 }
 
 function asNumber(value: unknown) {
@@ -83,13 +88,60 @@ export default class ManagementReportService {
     })
   }
 
+  private async ensureStakeholder(payload: StakeholderPayload) {
+    const dpnId = asNumber(payload.dpn_id)
+    const stakeholderName = cleanText(payload.name)
+
+    if (!dpnId) throw new ErrorResponse.BadRequest('DPN wajib dipilih.')
+    if (!stakeholderName) throw new ErrorResponse.BadRequest('Kelompok kerja wajib diisi.')
+
+    const dpn = await Dpn.findByPk(dpnId)
+    if (!dpn) throw new ErrorResponse.NotFound('DPN tidak ditemukan.')
+
+    let stakeholder = await Stakeholder.findOne({
+      where: { name: { [Op.iLike]: stakeholderName } },
+    })
+
+    if (!stakeholder) {
+      const nextStakeholderId = Number((await Stakeholder.max('stakeholder_id')) || 0) + 1
+      stakeholder = await Stakeholder.create({
+        stakeholder_id: nextStakeholderId,
+        name: stakeholderName,
+        type: null,
+      })
+    }
+
+    const stakeholderId = Number(stakeholder.stakeholder_id)
+    const existingAccess = await StakeholderDpn.findOne({
+      where: { stakeholder_id: stakeholderId, dpn_id: dpnId },
+    })
+
+    if (!existingAccess) {
+      await StakeholderDpn.create({
+        stakeholder_id: stakeholderId,
+        dpn_id: dpnId,
+      })
+    }
+
+    return {
+      stakeholder_id: stakeholderId,
+      name: cleanText(stakeholder.name) || stakeholderName,
+      pelaksana_id: stakeholderId,
+      nama_pelaksana: cleanText(stakeholder.name) || stakeholderName,
+    }
+  }
+
+  async createStakeholderOption(payload: StakeholderPayload) {
+    return this.ensureStakeholder(payload)
+  }
+
   async save(payload: ReportPayload, file?: Express.Multer.File, id?: string | number, actor?: CurrentUser | null) {
     const dpnId = asNumber(payload.dpn_id)
     const tahap = asNumber(payload.tahap)
     const tahun = asNumber(payload.tahun)
     const namaFile = cleanText(payload.nama_file)
-    const kelompokKerja = cleanText(payload.kelompok_kerja)
-    let pelaksanaId = asNumber(payload.pelaksana_id)
+    let kelompokKerja = cleanText(payload.kelompok_kerja)
+    let stakeholderId = asNumber(payload.pelaksana_id)
 
     if (!dpnId) throw new ErrorResponse.BadRequest('DPN wajib dipilih.')
     if (!kelompokKerja) throw new ErrorResponse.BadRequest('Kelompok kerja wajib diisi.')
@@ -104,23 +156,30 @@ export default class ManagementReportService {
     const dpn = await Dpn.findByPk(dpnId)
     if (!dpn) throw new ErrorResponse.NotFound('DPN tidak ditemukan.')
 
-    if (!pelaksanaId) {
-      const existingPelaksana = await Pelaksana.findOne({
-        where: { nama_pelaksana: { [Op.iLike]: kelompokKerja } },
-      })
-      if (existingPelaksana) {
-        pelaksanaId = Number(existingPelaksana.pelaksana_id)
-      } else {
-        const jenisPelaksana = await JenisPelaksana.findOne({ order: [['jenis_pelaksana_id', 'asc']] })
-        const nextPelaksanaId = Number((await Pelaksana.max('pelaksana_id')) || 0) + 1
-        const createdPelaksana = await Pelaksana.create({
-          pelaksana_id: nextPelaksanaId,
-          jenis_pelaksana_id: Number(jenisPelaksana?.jenis_pelaksana_id || 1),
-          nama_pelaksana: kelompokKerja,
-          catatan: 'Ditambahkan dari Manajemen Pelaporan',
-        })
-        pelaksanaId = Number(createdPelaksana.pelaksana_id)
+    if (stakeholderId) {
+      const stakeholder = await Stakeholder.findByPk(stakeholderId)
+      if (!stakeholder) throw new ErrorResponse.NotFound('Perangkat tidak ditemukan.')
+      const stakeholderName = cleanText(stakeholder.name)
+      if (stakeholderName) {
+        kelompokKerja = stakeholderName
       }
+
+      const existingAccess = await StakeholderDpn.findOne({
+        where: { stakeholder_id: stakeholderId, dpn_id: dpnId },
+      })
+      if (!existingAccess) {
+        await StakeholderDpn.create({
+          stakeholder_id: stakeholderId,
+          dpn_id: dpnId,
+        })
+      }
+    } else {
+      const stakeholderOption = await this.ensureStakeholder({
+        dpn_id: dpnId,
+        name: kelompokKerja,
+      })
+      stakeholderId = Number(stakeholderOption.stakeholder_id)
+      kelompokKerja = stakeholderOption.name
     }
 
     let linkFile = existing?.link_file || ''
@@ -148,7 +207,7 @@ export default class ManagementReportService {
     const values = {
       dpn_id: dpnId,
       dpn_nama: dpn.nama_dpn,
-      pelaksana_id: pelaksanaId,
+      pelaksana_id: stakeholderId,
       kelompok_kerja: kelompokKerja,
       nama_file: namaFile,
       tahap,
@@ -199,12 +258,24 @@ export default class ManagementReportService {
     }
   }
 
-  async pelaksanaOptions() {
-    const rows = await Pelaksana.findAll({
-      attributes: ['pelaksana_id', 'nama_pelaksana'],
-      order: [['nama_pelaksana', 'asc']],
+  async stakeholderOptions() {
+    const rows = await Stakeholder.findAll({
+      attributes: ['stakeholder_id', 'name'],
+      order: [['name', 'asc']],
     })
 
-    return rows.map((row) => row.get())
+    return rows.map((row) => {
+      const values = row.get()
+      return {
+        stakeholder_id: values.stakeholder_id,
+        name: values.name,
+        pelaksana_id: values.stakeholder_id,
+        nama_pelaksana: values.name,
+      }
+    })
+  }
+
+  async pelaksanaOptions() {
+    return this.stakeholderOptions()
   }
 }

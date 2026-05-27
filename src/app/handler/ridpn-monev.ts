@@ -34,8 +34,9 @@ route.get(
 
 route.get(
   '/contributors',
-  asyncHandler(async (_req: Request, res: Response) => {
-    const records = await service.contributors()
+  asyncHandler(async (req: Request, res: Response) => {
+    const user = await notificationService.getCurrentUser(req)
+    const records = await service.contributors(user)
     const httpResponse = HttpResponse.get({
       data: {
         data: records,

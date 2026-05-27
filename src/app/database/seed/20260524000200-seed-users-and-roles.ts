@@ -68,7 +68,7 @@ export async function up(queryInterface: QueryInterface, Sequelize: typeof DataT
     `,
     {
       replacements: {
-        name: 'Super Admin',
+        name: 'superadmin',
         email: process.env.SUPER_ADMIN_EMAIL || 'superadmin@kemenpar.go.id',
         password,
         roleCode: 'super_admin',
