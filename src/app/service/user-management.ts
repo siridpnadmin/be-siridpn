@@ -161,21 +161,32 @@ export default class UserManagementService {
     )
   }
 
-  async find({ page, pageSize, filtered = [], sorted = [] }: FindParams) {
+  async find(
+    { page, pageSize, filtered = [], sorted = [] }: FindParams,
+    actor?: ManagementActor | null
+  ) {
     const query = useQuery({
       model: User,
       reqQuery: { page, pageSize, filtered, sorted },
       includeRule: [{ model: Role }, { model: UserDpnAccess, include: [Dpn] }],
     })
+    const where =
+      actor?.role_code === 'manager_admin'
+        ? {
+            ...query.where,
+            role_code: { [Op.in]: ['local_admin', 'executive'] },
+          }
+        : query.where
 
     const data = await User.findAll({
       ...query,
+      where,
       order:
         Array.isArray(query.order) && query.order.length ? query.order : [['created_at', 'desc']],
     })
 
     const total = await User.count({
-      where: query.where,
+      where,
       include: query.includeCount,
       distinct: true,
     })
@@ -183,13 +194,22 @@ export default class UserManagementService {
     return { data: data.map((user) => this.sanitizeUser(user)), total }
   }
 
-  async findById(id: string) {
+  async findById(id: string, actor?: ManagementActor | null) {
     const user = await User.findByPk(id, {
       include: [Role, { model: UserDpnAccess, include: [Dpn] }],
     })
 
     if (!user) {
       throw new ErrorResponse.NotFound('user not found')
+    }
+
+    if (
+      actor?.role_code === 'manager_admin' &&
+      !['local_admin', 'executive'].includes(user.role_code)
+    ) {
+      throw new ErrorResponse.Forbidden(
+        'manager admin can only view local admin and executive users'
+      )
     }
 
     return this.sanitizeUser(user)

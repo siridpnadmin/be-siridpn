@@ -22,12 +22,15 @@ route.get(
     const actor = await notificationService.getCurrentUser(req)
     service.assertActorCanAccessManagement(actor)
     const { page, pageSize, filtered, sorted } = req.getQuery()
-    const records = await service.find({
-      page,
-      pageSize,
-      filtered: filtered as QueryFilters[] | undefined,
-      sorted: sorted as QuerySorts[] | undefined,
-    })
+    const records = await service.find(
+      {
+        page,
+        pageSize,
+        filtered: filtered as QueryFilters[] | undefined,
+        sorted: sorted as QuerySorts[] | undefined,
+      },
+      actor
+    )
     const httpResponse = HttpResponse.get({ data: records })
     res.status(200).json(httpResponse)
   })
@@ -50,7 +53,7 @@ route.get(
     const actor = await notificationService.getCurrentUser(req)
     service.assertActorCanAccessManagement(actor)
     const { id } = req.getParams()
-    const record = await service.findById(id)
+    const record = await service.findById(id, actor)
     const httpResponse = HttpResponse.get({ data: record })
     res.status(200).json(httpResponse)
   })
