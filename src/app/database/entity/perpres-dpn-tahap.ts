@@ -1,4 +1,12 @@
-import { Column, DataType, Model, PrimaryKey, Table, BelongsTo, HasMany } from 'sequelize-typescript'
+import {
+  Column,
+  DataType,
+  Model,
+  PrimaryKey,
+  Table,
+  BelongsTo,
+  HasMany,
+} from 'sequelize-typescript'
 import Dpn from './dpn'
 import Perpres from './perpres'
 import Kegiatan from './kegiatan'
@@ -21,7 +29,7 @@ export default class PerpresDpnTahap extends Model {
   @Column({ type: DataType.DATEONLY, allowNull: true })
   tanggal_penetapan?: string
 
-  @Column({ type: DataType.ENUM('draft', 'terpublikasi'), allowNull: true })
+  @Column({ type: DataType.ENUM('draft', 'terpublikasi', 'dicabut'), allowNull: true })
   status?: string
 
   @Column({ type: DataType.TEXT, allowNull: true })

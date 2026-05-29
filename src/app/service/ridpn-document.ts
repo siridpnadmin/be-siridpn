@@ -2,10 +2,11 @@ import { Model, ModelStatic, Op } from 'sequelize'
 import ErrorResponse from '~/lib/http/errors'
 import { db } from '../database/connection'
 import Dpn from '../database/entity/dpn'
+import MonevPhase from '../database/entity/monev-phase'
 import Perpres from '../database/entity/perpres'
 import PerpresDpnTahap from '../database/entity/perpres-dpn-tahap'
 
-type RidpnDocumentStatus = 'terbit' | 'rancangan'
+type RidpnDocumentStatus = 'terbit' | 'rancangan' | 'dicabut'
 
 type RidpnDocumentTargetPayload = {
   id?: string | number
@@ -21,12 +22,38 @@ type RidpnDocumentPayload = {
 }
 
 function toBackendStatus(status: RidpnDocumentStatus) {
-  return status === 'terbit' ? 'terpublikasi' : 'draft'
+  if (status === 'terbit') return 'terpublikasi'
+  if (status === 'dicabut') return 'dicabut'
+  return 'draft'
+}
+
+function toRidpnDocumentStatus(status?: string | null): RidpnDocumentStatus {
+  if (status === 'terpublikasi') return 'terbit'
+  if (status === 'dicabut') return 'dicabut'
+  return 'rancangan'
 }
 
 function normalizeTahap(tahap: string) {
   const trimmed = String(tahap || '').trim()
   return trimmed.toLowerCase().startsWith('tahap ') ? trimmed : `Tahap ${trimmed}`
+}
+
+function cleanTahapLabel(value?: string | null) {
+  return String(value ?? '')
+    .trim()
+    .replace(/^tahap\s+/i, '')
+}
+
+function cleanDocumentText(value: string) {
+  return value.replace(/\bTahap\s+Tahap\b/gi, 'Tahap')
+}
+
+function documentLabel(document: PerpresDpnTahap) {
+  return cleanDocumentText(
+    `${document.perpres?.no_perpres ?? ''} - RIDPN ${
+      document.dpn?.nama_dpn ?? 'DPN'
+    } Tahap ${cleanTahapLabel(document.tahap)}`
+  )
 }
 
 function normalizeTargets(targets: RidpnDocumentTargetPayload[]) {
@@ -78,7 +105,7 @@ export default class RidpnDocumentService {
         id: String(row.perpres_id),
         target_id: String(row.perpres_dpn_tahap_id),
         no_perpres: row.perpres?.no_perpres ?? '',
-        status: row.perpres?.status === 'terpublikasi' ? 'terbit' : 'rancangan',
+        status: toRidpnDocumentStatus(row.perpres?.status),
         dpn_id: String(row.dpn_id),
         tahap: row.tahap,
         link: row.perpres?.link ?? null,
@@ -208,8 +235,25 @@ export default class RidpnDocumentService {
       const savedTargets = await PerpresDpnTahap.findAll({
         where: { perpres_id: perpres.perpres_id },
         transaction,
+        include: [{ model: Perpres }, { model: Dpn }],
         order: [['perpres_dpn_tahap_id', 'asc']],
       })
+
+      if (status === 'dicabut') {
+        const revokedLabels = savedTargets.map(documentLabel).filter(Boolean)
+        if (revokedLabels.length) {
+          await MonevPhase.update(
+            { status: 'nonaktif', updated_at: new Date() },
+            {
+              where: {
+                deleted_at: null,
+                perpres: { [Op.in]: revokedLabels },
+              },
+              transaction,
+            }
+          )
+        }
+      }
 
       return { perpres, targets: savedTargets }
     })

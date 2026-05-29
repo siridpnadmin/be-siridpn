@@ -32,11 +32,18 @@ type LoginPayload = {
   password?: string
 }
 
+type ManagementActor = {
+  id?: string | null
+  role_code?: string | null
+}
+
 const manageableRoleCodes = ['super_admin', 'manager_admin', 'local_admin', 'executive']
 const usernamePattern = /^[a-z0-9._-]+$/
 
 function normalizeUsername(value?: string) {
-  return String(value || '').trim().toLowerCase()
+  return String(value || '')
+    .trim()
+    .toLowerCase()
 }
 
 export default class UserManagementService {
@@ -53,6 +60,31 @@ export default class UserManagementService {
   private assertManageableRole(roleCode?: string) {
     if (!roleCode || !manageableRoleCodes.includes(roleCode)) {
       throw new ErrorResponse.BadRequest('role is not allowed for user management')
+    }
+  }
+
+  private assertActorCanManageRole(
+    actor: ManagementActor | null | undefined,
+    roleCode?: string | null
+  ) {
+    if (!actor?.id) {
+      throw new ErrorResponse.Unauthorized('session is required')
+    }
+
+    if (actor.role_code === 'super_admin') return
+
+    throw new ErrorResponse.Forbidden('only super admin can manage users')
+  }
+
+  assertActorCanAccessManagement(actor: ManagementActor | null | undefined) {
+    if (!actor?.id) {
+      throw new ErrorResponse.Unauthorized('session is required')
+    }
+
+    if (actor.role_code !== 'super_admin' && actor.role_code !== 'manager_admin') {
+      throw new ErrorResponse.Forbidden(
+        'only super admin or manager admin can access user management'
+      )
     }
   }
 
@@ -138,7 +170,8 @@ export default class UserManagementService {
 
     const data = await User.findAll({
       ...query,
-      order: Array.isArray(query.order) && query.order.length ? query.order : [['created_at', 'desc']],
+      order:
+        Array.isArray(query.order) && query.order.length ? query.order : [['created_at', 'desc']],
     })
 
     const total = await User.count({
@@ -151,7 +184,9 @@ export default class UserManagementService {
   }
 
   async findById(id: string) {
-    const user = await User.findByPk(id, { include: [Role, { model: UserDpnAccess, include: [Dpn] }] })
+    const user = await User.findByPk(id, {
+      include: [Role, { model: UserDpnAccess, include: [Dpn] }],
+    })
 
     if (!user) {
       throw new ErrorResponse.NotFound('user not found')
@@ -160,8 +195,9 @@ export default class UserManagementService {
     return this.sanitizeUser(user)
   }
 
-  async create(payload: UserPayload) {
+  async create(payload: UserPayload, actor?: ManagementActor | null) {
     this.assertManageableRole(payload.role_code)
+    this.assertActorCanManageRole(actor, payload.role_code)
     this.assertDpnAccessPayload(payload.role_code, payload.dpn_ids)
 
     if (!payload.name || !payload.email || !payload.password) {
@@ -184,7 +220,7 @@ export default class UserManagementService {
     return this.findById(user.id)
   }
 
-  async update(id: string, payload: UserPayload) {
+  async update(id: string, payload: UserPayload, actor?: ManagementActor | null) {
     const user = await User.findByPk(id)
 
     if (!user) {
@@ -199,6 +235,8 @@ export default class UserManagementService {
     await this.assertUniqueUserIdentity(nextUsername, payload.email, user.id)
 
     const nextRoleCode = payload.role_code ?? user.role_code
+    this.assertActorCanManageRole(actor, user.role_code)
+    this.assertActorCanManageRole(actor, nextRoleCode)
     this.assertDpnAccessPayload(nextRoleCode, payload.dpn_ids)
 
     await user.update({
@@ -215,7 +253,15 @@ export default class UserManagementService {
     return this.findById(user.id)
   }
 
-  async delete(id: string) {
+  async delete(id: string, actor?: ManagementActor | null) {
+    const user = await User.findByPk(id)
+
+    if (!user) {
+      throw new ErrorResponse.NotFound('user not found')
+    }
+
+    this.assertActorCanManageRole(actor, user.role_code)
+
     const deleted = await User.destroy({ where: { id } })
 
     if (!deleted) {
@@ -224,7 +270,9 @@ export default class UserManagementService {
   }
 
   async login(payload: LoginPayload) {
-    const identifier = String(payload.identifier || payload.email || '').trim().toLowerCase()
+    const identifier = String(payload.identifier || payload.email || '')
+      .trim()
+      .toLowerCase()
 
     if (!identifier || !payload.password) {
       throw new ErrorResponse.BadRequest('email/username and password are required')

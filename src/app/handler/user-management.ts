@@ -3,19 +3,11 @@ import { asyncHandler } from '~/lib/async-handler'
 import HttpResponse from '~/lib/http/response'
 import type { QueryFilters, QuerySorts } from '~/lib/query-builder/types'
 import UserManagementService from '../service/user-management'
-import NotificationService, { type CurrentUser } from '../service/notification'
+import NotificationService from '../service/notification'
 
 const route = express.Router()
 const service = new UserManagementService()
 const notificationService = new NotificationService()
-
-async function getOptionalActor(req: Request): Promise<CurrentUser | null> {
-  try {
-    return await notificationService.getCurrentUser(req)
-  } catch (_error) {
-    return null
-  }
-}
 
 function getNotificationUser(record: Record<string, unknown>) {
   return {
@@ -27,6 +19,8 @@ function getNotificationUser(record: Record<string, unknown>) {
 route.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
+    const actor = await notificationService.getCurrentUser(req)
+    service.assertActorCanAccessManagement(actor)
     const { page, pageSize, filtered, sorted } = req.getQuery()
     const records = await service.find({
       page,
@@ -41,7 +35,9 @@ route.get(
 
 route.get(
   '/roles',
-  asyncHandler(async (_req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
+    const actor = await notificationService.getCurrentUser(req)
+    service.assertActorCanAccessManagement(actor)
     const roles = await service.roles()
     const httpResponse = HttpResponse.get({ data: roles })
     res.status(200).json(httpResponse)
@@ -51,6 +47,8 @@ route.get(
 route.get(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
+    const actor = await notificationService.getCurrentUser(req)
+    service.assertActorCanAccessManagement(actor)
     const { id } = req.getParams()
     const record = await service.findById(id)
     const httpResponse = HttpResponse.get({ data: record })
@@ -61,8 +59,8 @@ route.get(
 route.post(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const actor = await getOptionalActor(req)
-    const record = await service.create(req.getBody())
+    const actor = await notificationService.getCurrentUser(req)
+    const record = await service.create(req.getBody(), actor)
     const notificationUser = getNotificationUser(record)
     if (notificationUser.id && notificationUser.id !== actor?.id) {
       await notificationService.create({
@@ -89,8 +87,8 @@ route.put(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.getParams()
-    const actor = await getOptionalActor(req)
-    const record = await service.update(id, req.getBody())
+    const actor = await notificationService.getCurrentUser(req)
+    const record = await service.update(id, req.getBody(), actor)
     const notificationUser = getNotificationUser(record)
     if (notificationUser.id && notificationUser.id !== actor?.id) {
       await notificationService.create({
@@ -117,7 +115,8 @@ route.delete(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.getParams()
-    await service.delete(id)
+    const actor = await notificationService.getCurrentUser(req)
+    await service.delete(id, actor)
     const httpResponse = HttpResponse.deleted({})
     res.status(200).json(httpResponse)
   })

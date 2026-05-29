@@ -37,7 +37,9 @@ function normalizeText(value: unknown) {
 }
 
 function cleanTahapLabel(value?: string | null) {
-  return String(value ?? '').trim().replace(/^tahap\s+/i, '')
+  return String(value ?? '')
+    .trim()
+    .replace(/^tahap\s+/i, '')
 }
 
 function cleanDocumentText(value: string) {
@@ -52,14 +54,17 @@ function documentLabel(document: PerpresDpnTahap) {
   )
 }
 
+function isAccessAll(value: string) {
+  return normalizeText(value) === 'akses semua'
+}
+
 async function getPhaseSubmissionStats(phase: MonevPhase, documents: PerpresDpnTahap[]) {
   const perpres = cleanDocumentText(String(phase.perpres || ''))
-  const targetIds =
-    normalizeText(perpres) === 'akses semua'
-      ? documents.map((document) => Number(document.perpres_dpn_tahap_id))
-      : documents
-          .filter((document) => normalizeText(documentLabel(document)) === normalizeText(perpres))
-          .map((document) => Number(document.perpres_dpn_tahap_id))
+  const targetIds = isAccessAll(perpres)
+    ? documents.map((document) => Number(document.perpres_dpn_tahap_id))
+    : documents
+        .filter((document) => normalizeText(documentLabel(document)) === normalizeText(perpres))
+        .map((document) => Number(document.perpres_dpn_tahap_id))
 
   if (!targetIds.length) {
     return { jumlahSubmisi: 0, totalRa: 0, perluReview: 0 }
@@ -144,7 +149,9 @@ export default class MonevPhaseService {
     const kodeAkses = String(payload.kode_akses || '').trim()
 
     if (!namaFase || !perpres || !slug || !kodeAkses) {
-      throw new ErrorResponse.BadRequest('nama_fase, perpres, url_slug, and kode_akses are required')
+      throw new ErrorResponse.BadRequest(
+        'nama_fase, perpres, url_slug, and kode_akses are required'
+      )
     }
     if (!payload.tanggal_mulai || !payload.tanggal_selesai) {
       throw new ErrorResponse.BadRequest('tanggal_mulai and tanggal_selesai are required')
@@ -167,8 +174,26 @@ export default class MonevPhaseService {
     }
   }
 
+  private async assertPerpresCanBeUsed(perpres: string) {
+    if (isAccessAll(perpres)) return
+
+    const documents = await PerpresDpnTahap.findAll({
+      include: [{ model: Perpres }, { model: Dpn }],
+    })
+    const selectedDocument = documents.find(
+      (document) => normalizeText(documentLabel(document)) === normalizeText(perpres)
+    )
+
+    if (selectedDocument?.perpres?.status === 'dicabut') {
+      throw new ErrorResponse.BadRequest(
+        'Perpres yang sudah dicabut tidak bisa dibuat menjadi fase monev.'
+      )
+    }
+  }
+
   async create(payload: MonevPhasePayload) {
     const values = this.normalizePayload(payload)
+    await this.assertPerpresCanBeUsed(values.perpres)
     const duplicate = await MonevPhase.findOne({
       where: {
         url_slug: values.url_slug,
@@ -194,6 +219,7 @@ export default class MonevPhaseService {
     }
 
     const values = this.normalizePayload(payload)
+    await this.assertPerpresCanBeUsed(values.perpres)
     const duplicate = await MonevPhase.findOne({
       where: {
         id: { [Op.ne]: id },
